@@ -1,5 +1,6 @@
 const cron = require('node-cron');
 const { generateAlerts } = require('../controllers/alertController');
+const scheduleKeepAlive = require('../cron/keepAliveScheduler');
 
 // Schedule tasks to be run on the server
 const initCronJobs = () => {
@@ -13,6 +14,9 @@ const initCronJobs = () => {
       console.error('Error in alert generation cron job:', error);
     }
   });
+  
+  // Schedule keep-alive pings to prevent Render from sleeping
+  scheduleKeepAlive();
   
   console.log('Cron jobs initialized');
 };
