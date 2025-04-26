@@ -639,7 +639,14 @@ const getUserAlerts = async (req, res) => {
     console.log('Checking for new alerts before retrieving user alerts...');
     
     try {
+      // Always generate fresh alerts, especially for tomorrow's expirations
       const result = await generateAlerts(null, null);
+      if (result.alertsCreated > 0) {
+        console.log(`Created ${result.alertsCreated} new alerts during user fetch`);
+      }
+      if (result.itemsExpiringTomorrowCount > 0) {
+        console.log(`Found ${result.itemsExpiringTomorrowCount} items expiring tomorrow`);
+      }
       if (result.emailsSent > 0) {
         console.log(`Sent ${result.emailsSent} emails during alert check`);
       }
