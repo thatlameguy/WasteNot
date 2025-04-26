@@ -3877,3 +3877,22 @@ tr.selected-row:hover {
   padding: 40px 0;
   color: var(--text-secondary);
 }
+
+/* Add these styles at the end of the file */
+
+.last-refresh-time {
+  font-size: 0.8rem;
+  color: #666;
+  margin-top: 0.5rem;
+  text-align: right;
+}
+
+.alerts-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.alerts-actions button {
+  margin-bottom: 0.5rem;
+}

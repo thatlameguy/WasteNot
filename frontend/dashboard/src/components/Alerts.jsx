@@ -6,10 +6,20 @@ function Alerts() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [generatingAlerts, setGeneratingAlerts] = useState(false)
+  const [lastRefresh, setLastRefresh] = useState(null)
 
   useEffect(() => {
     // Generate and fetch alerts when component mounts
     generateAndFetchAlerts()
+
+    // Set up polling to check for new alerts every 3 minutes
+    const refreshInterval = setInterval(() => {
+      console.log("Auto-refreshing alerts...")
+      fetchAlerts()
+    }, 3 * 60 * 1000) // 3 minutes in milliseconds
+
+    // Clean up interval on component unmount
+    return () => clearInterval(refreshInterval)
   }, [])
 
   // New function to generate alerts and then fetch them
@@ -83,6 +93,7 @@ function Alerts() {
       }
 
       setAlerts(data)
+      setLastRefresh(new Date())
     } catch (err) {
       console.error("Error fetching alerts:", err)
       setError(err.message || "Failed to load alerts")
@@ -242,6 +253,12 @@ function Alerts() {
             <button onClick={clearAllAlerts} className="clear-all-button">
               Clear All
             </button>
+          )}
+          
+          {lastRefresh && (
+            <div className="last-refresh-time">
+              <small>Last updated: {lastRefresh.toLocaleTimeString()}</small>
+            </div>
           )}
         </div>
       </div>
