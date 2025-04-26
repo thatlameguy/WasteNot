@@ -25,6 +25,7 @@ import WhitelistInstructions from "./components/WhitelistInstructions"
 import "./styles/WhitelistInstructions.css"
 import ResetPassword from "./components/ResetPassword"
 import { Loader } from "lucide-react"
+import { API_URL } from './utils/api';
 
 function App() {
   // Get authentication state from AuthContext
@@ -34,9 +35,6 @@ function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [fetchError, setFetchError] = useState("");
-  
-  // API URL for backend
-  const API_URL = "http://localhost:8000/api";
   
   // Add this function to fetch food items from the backend
   const fetchFoodItems = async () => {
