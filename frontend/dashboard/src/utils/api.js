@@ -3,8 +3,8 @@ const getApiUrl = () => {
   // Check if we're in production
   if (window.location.hostname !== 'localhost' && 
       !window.location.hostname.includes('127.0.0.1')) {
-    // Replace with your production backend URL when you deploy
-    return 'http://your-production-backend-url.com/api';
+    // Production backend URL
+    return 'https://wastenot-backend-test.onrender.com/api';
   }
   
   // Local development
