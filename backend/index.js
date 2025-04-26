@@ -12,7 +12,9 @@ const app = express();
 // Middleware
 app.use(cors({
   origin: ['http://localhost:5173', 'https://waste-not-frontend.vercel.app'],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 app.use(express.json());
 
@@ -54,6 +56,16 @@ try {
 // Default route for testing
 app.get('/', (req, res) => {
   res.send('API is running...');
+});
+
+// Test connection endpoint
+app.get('/api/test-connection', (req, res) => {
+  res.status(200).json({ 
+    success: true, 
+    message: 'Connection to backend API successful',
+    cors: 'Enabled for waste-not-frontend.vercel.app',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Start server
