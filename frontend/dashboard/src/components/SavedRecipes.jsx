@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Loader, Trash2 } from "lucide-react"
 import RecipeDetailModal from "./RecipeDetailModal"
+import { API_URL } from "../utils/api"
 
 function SavedRecipes() {
   const [recipes, setRecipes] = useState([])
@@ -25,7 +26,7 @@ function SavedRecipes() {
         throw new Error("Not authenticated")
       }
 
-      const response = await fetch("http://localhost:8000/api/recipes", {
+      const response = await fetch(`${API_URL}/recipes`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -59,7 +60,7 @@ function SavedRecipes() {
         throw new Error("Not authenticated")
       }
 
-      const response = await fetch(`http://localhost:8000/api/recipes/${recipeId}`, {
+      const response = await fetch(`${API_URL}/recipes/${recipeId}`, {
         method: "DELETE",
         headers: {
           "Authorization": `Bearer ${token}`
@@ -105,7 +106,7 @@ function SavedRecipes() {
         throw new Error("Not authenticated");
       }
 
-      const response = await fetch("http://localhost:8000/api/alerts/generate", {
+      const response = await fetch(`${API_URL}/alerts/generate`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,

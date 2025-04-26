@@ -2,6 +2,7 @@
 
 import { useState } from "react"
 import { X, Calendar, AlertCircle } from "lucide-react"
+import { API_URL } from "../utils/api"
 
 const AddItemModal = ({ onClose, onAdd }) => {
   const [name, setName] = useState("")
@@ -72,7 +73,7 @@ const AddItemModal = ({ onClose, onAdd }) => {
       }
       
       // Send the request to the server
-      const response = await fetch("http://localhost:8000/api/food-items", {
+      const response = await fetch(`${API_URL}/food-items`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import FreshnessBar from "./FreshnessBar"
+import { API_URL } from "../utils/api"
 
 function UpcomingExpirations({ items, onItemAction }) {
   const [searchTerm, setSearchTerm] = useState("")
@@ -18,9 +19,6 @@ function UpcomingExpirations({ items, onItemAction }) {
   const [currentDate, setCurrentDate] = useState(new Date())
   const [showFilters, setShowFilters] = useState(false)
   const [calculatingItems, setCalculatingItems] = useState({}) // Track items being calculated
-
-  // API URL for backend
-  const API_URL = "http://localhost:8000/api";
 
   // Update current date every minute for real-time expiry tracking
   useEffect(() => {
