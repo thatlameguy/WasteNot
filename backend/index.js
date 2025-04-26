@@ -2,6 +2,7 @@ const express = require('express');
 const dotenv = require('dotenv');
 const cors = require('cors');
 const connectDB = require('./config/db');
+const initCronJobs = require('./utils/cronJobs');
 
 // Load environment variables
 dotenv.config();
@@ -31,6 +32,9 @@ try {
 // Connect to database
 try {
   connectDB();
+  // Initialize cron jobs after database connection
+  initCronJobs();
+  console.log('Cron jobs for automated alerts initialized');
 } catch (error) {
   console.error('Failed to connect to database:', error);
 }
