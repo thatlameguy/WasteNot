@@ -4,12 +4,10 @@ import Signup from "./Signup";
 import ForgotPassword from "./ForgotPassword";
 import AuthImage from "./AuthImage";
 import ThemeToggle from "./ThemeToggle";
-import TestConnection from "./TestConnection";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [isForgotPassword, setIsForgotPassword] = useState(false);
-  const [showConnectionTest, setShowConnectionTest] = useState(false);
 
   const toggleForm = () => {
     setIsLogin(!isLogin);
@@ -58,25 +56,6 @@ const Auth = () => {
             ) : (
               <Signup onToggleForm={toggleForm} />
             )}
-            
-            {/* Connection test toggle button */}
-            <button 
-              onClick={() => setShowConnectionTest(!showConnectionTest)}
-              style={{ 
-                marginTop: '20px', 
-                padding: '5px 10px', 
-                background: 'transparent', 
-                border: '1px solid #ccc', 
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '12px'
-              }}
-            >
-              {showConnectionTest ? 'Hide Connection Test' : 'Show Connection Test'}
-            </button>
-            
-            {/* Show connection test if enabled */}
-            {showConnectionTest && <TestConnection />}
           </div>
         </div>
       </div>

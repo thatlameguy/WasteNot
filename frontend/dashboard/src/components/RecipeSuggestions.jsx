@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { Loader } from "lucide-react"
 import RecipeDetailModal from "./RecipeDetailModal"
+import { API_URL } from "../utils/api"
 
 const RecipeSuggestions = ({ items, onSaveRecipe }) => {
   const [suggestions, setSuggestions] = useState([])
@@ -90,7 +91,7 @@ const RecipeSuggestions = ({ items, onSaveRecipe }) => {
         throw new Error("Not authenticated")
       }
 
-      const response = await fetch("http://localhost:8000/api/recipes", {
+      const response = await fetch(`${API_URL}/recipes`, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${token}`,
