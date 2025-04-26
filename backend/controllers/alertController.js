@@ -1,0 +1,464 @@
+// backend/controllers/alertController.js
+const Alert = require('../models/alertModel');
+const FoodItem = require('../models/foodItemModel');
+const User = require('../models/userModel');
+const nodemailer = require('nodemailer');
+
+// @desc    Generate alerts for expiring food items
+// @route   GET /api/alerts/generate
+// @access  Private (Admin only or scheduled job)
+const generateAlerts = async (req, res) => {
+  try {
+    console.log('Generating alerts for expiring food items...');
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    // Enhanced query to find items requiring alerts based on our sophisticated freshness criteria
+    const items = await FoodItem.find({
+      status: 'active', // Only include active items
+      $or: [
+        // Items expiring within 3 days
+        { 
+          expiryDate: { 
+            $lte: new Date(today.getTime() + 3 * 24 * 60 * 60 * 1000) // today + 3 days
+          }
+        },
+        // Items with low freshness that need alerts
+        { freshness: { $lt: 40 } },
+        // Near expiry items
+        { condition: "Near expiry" },
+        // All items expiring today 
+        {
+          expiryDate: {
+            $gte: today,
+            $lt: new Date(today.getTime() + 24 * 60 * 60 * 1000) // today + 1 day
+          }
+        }
+      ]
+    }).populate('userId', 'name email');
+    
+    console.log(`Found ${items.length} items that may need alerts based on expiration or freshness conditions`);
+    
+    // Find items specifically expiring tomorrow for special handling
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    
+    const dayAfterTomorrow = new Date(tomorrow);
+    dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+    
+    // Separate items expiring tomorrow for special handling
+    const itemsExpiringTomorrow = items.filter(item => {
+      const expiryDate = new Date(item.expiryDate);
+      expiryDate.setHours(0, 0, 0, 0);
+      return expiryDate >= tomorrow && expiryDate < dayAfterTomorrow;
+    });
+    
+    // Identify items with critical conditions
+    const criticalItems = items.filter(item => {
+      const expiryDate = new Date(item.expiryDate);
+      expiryDate.setHours(0, 0, 0, 0);
+      const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+      
+      return (
+        // Critical combination: Near expiry and expiring today
+        (daysUntilExpiry === 0 && item.condition === "Near expiry") ||
+        // Already expired items
+        (daysUntilExpiry < 0) ||
+        // Very low freshness
+        (item.freshness < 30) ||
+        // Dairy or meat with low freshness 
+        ((isDairyProduct(item.name) || isMeatProduct(item.name)) && item.freshness < 40)
+      );
+    });
+    
+    console.log(`Found ${itemsExpiringTomorrow.length} items expiring tomorrow`);
+    console.log(`Found ${criticalItems.length} items in critical condition requiring immediate attention`);
+    
+    let alertsCreated = 0;
+    let emailsSent = 0;
+    
+    // Process all items
+    for (const item of items) {
+      const expiryDate = new Date(item.expiryDate);
+      expiryDate.setHours(0, 0, 0, 0);
+      
+      const timeDiff = expiryDate.getTime() - today.getTime();
+      const daysRemaining = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+      
+      // Determine alert type
+      const alertType = daysRemaining <= 0 ? 'expired' : 'expiring_soon';
+      
+      // Check if this item is expiring TOMORROW specifically
+      const isExpiringTomorrow = daysRemaining === 1;
+      
+      // Check if this is a critical item (needs special attention)
+      const isCritical = criticalItems.some(criticalItem => 
+        criticalItem._id.toString() === item._id.toString()
+      );
+      
+      // For critical items and those expiring tomorrow, ensure a fresh alert
+      if (isCritical || isExpiringTomorrow) {
+        // Delete any existing alerts for this item to ensure a fresh alert is created
+        await Alert.deleteMany({
+          foodItemId: item._id,
+          type: alertType
+        });
+      }
+      
+      // Check if alert already exists for this item
+      const existingAlert = await Alert.findOne({
+        foodItemId: item._id,
+        type: alertType,
+        isRead: false
+      });
+      
+      // Logic for determining if we need to create or update an alert
+      const needsAlert = 
+        // No existing alert
+        !existingAlert || 
+        // Critical items always get fresh alerts
+        isCritical || 
+        // Items expiring tomorrow get refreshed alerts
+        isExpiringTomorrow || 
+        // Low freshness items
+        item.freshness < 40 ||
+        // Near expiry items with less than 3 days
+        (item.condition === "Near expiry" && daysRemaining <= 3);
+      
+      // Create or update alert if needed
+      if (needsAlert) {
+        let alertToUpdate;
+        
+        if (!existingAlert) {
+          // Get food category if available from freshnessReason (format might be "Category: Dairy")
+          let foodCategory = "";
+          if (item.freshnessReason && item.freshnessReason.includes("Category:")) {
+            const match = item.freshnessReason.match(/Category:\s*(\w+)/i);
+            if (match && match[1]) {
+              foodCategory = match[1];
+            }
+          }
+          
+          // Create new alert with detailed information
+          alertToUpdate = await Alert.create({
+            userId: item.userId._id,
+            foodItemId: item._id,
+            itemName: item.name,
+            expiryDate: item.expiryDate,
+            type: alertType,
+            daysRemaining: daysRemaining,
+            isRead: false,
+            isEmailSent: false,
+            isCritical: isCritical,
+            freshness: item.freshness,
+            foodCategory: foodCategory || getCategoryFromName(item.name)
+          });
+          
+          alertsCreated++;
+          console.log(`Created new alert for ${item.name} (expires in ${daysRemaining} days, freshness: ${item.freshness}%)`);
+        } else {
+          // Use existing alert but update its properties
+          alertToUpdate = existingAlert;
+          
+          // Update alert properties
+          alertToUpdate.daysRemaining = daysRemaining;
+          alertToUpdate.isEmailSent = false;
+          alertToUpdate.isCritical = isCritical;
+          alertToUpdate.freshness = item.freshness;
+          
+          await alertToUpdate.save();
+          console.log(`Updated existing alert for ${item.name}`);
+        }
+        
+        // Send email based on priority
+        // Critical items always get emails
+        // Expiring tomorrow items always get emails
+        // Other items get emails if not sent before
+        const shouldSendEmail = isCritical || isExpiringTomorrow || !alertToUpdate.isEmailSent;
+        
+        if (item.userId && item.userId.email && shouldSendEmail) {
+          console.log(`Sending email for ${item.name} (expires in ${daysRemaining} days, freshness: ${item.freshness}%)`);
+          await sendAlertEmail(item.userId, item, daysRemaining, alertType, isCritical);
+          
+          // Mark alert as email sent
+          alertToUpdate.isEmailSent = true;
+          await alertToUpdate.save();
+          
+          emailsSent++;
+        }
+      }
+    }
+    
+    // Return response if this was called from API
+    if (res) {
+      res.status(200).json({
+        message: 'Alerts generated successfully',
+        alertsCreated,
+        emailsSent,
+        tomorrowItems: itemsExpiringTomorrow.length,
+        criticalItems: criticalItems.length
+      });
+    }
+    
+    return {
+      alertsCreated,
+      emailsSent,
+      tomorrowItems: itemsExpiringTomorrow.length,
+      criticalItems: criticalItems.length
+    };
+  } catch (error) {
+    console.error('Error generating alerts:', error);
+    if (res) {
+      res.status(500).json({ message: 'Server error', error: error.message });
+    }
+    
+    return {
+      error: error.message
+    };
+  }
+};
+
+// @desc    Get all alerts for a user
+// @route   GET /api/alerts
+// @access  Private
+const getUserAlerts = async (req, res) => {
+  try {
+    // First run generateAlerts to make sure we have the latest alerts, especially for items expiring tomorrow
+    console.log('Checking for new alerts before retrieving user alerts...');
+    
+    try {
+      const result = await generateAlerts(null, null);
+      if (result.emailsSent > 0) {
+        console.log(`Sent ${result.emailsSent} emails during alert check`);
+      }
+    } catch (error) {
+      console.error('Error checking for new alerts:', error);
+      // Continue execution even if alert generation fails
+    }
+    
+    // Now retrieve alerts for the user
+    const alerts = await Alert.find({ userId: req.user._id })
+      .sort({ createdAt: -1 })
+      .populate({
+        path: 'foodItemId',
+        select: 'name expiryDate storage condition freshness',
+        options: { retainNullValues: true }
+      });
+    
+    res.json(alerts);
+  } catch (error) {
+    console.error('Error getting user alerts:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Mark alert as read
+// @route   PUT /api/alerts/:id/read
+// @access  Private
+const markAlertAsRead = async (req, res) => {
+  try {
+    const alert = await Alert.findById(req.params.id);
+    
+    if (!alert) {
+      return res.status(404).json({ message: 'Alert not found' });
+    }
+    
+    if (alert.userId.toString() !== req.user._id.toString()) {
+      return res.status(401).json({ message: 'User not authorized' });
+    }
+    
+    alert.isRead = true;
+    await alert.save();
+    
+    res.json(alert);
+  } catch (error) {
+    console.error('Error marking alert as read:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Clear all alerts for a user
+// @route   DELETE /api/alerts
+// @access  Private
+const clearAllAlerts = async (req, res) => {
+  try {
+    await Alert.deleteMany({ userId: req.user._id });
+    
+    res.json({ message: 'All alerts cleared' });
+  } catch (error) {
+    console.error('Error clearing alerts:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
+// Helper function to send email alerts
+const sendAlertEmail = async (user, item, daysRemaining, alertType, isCritical) => {
+  try {
+    // Create a nodemailer transporter
+    let transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.EMAIL_PORT || '587'),
+      secure: process.env.EMAIL_SECURE === 'true',
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS
+      },
+      // Add DKIM and SPF verification hints for email providers
+      dkim: process.env.DKIM_PRIVATE_KEY ? {
+        domainName: process.env.DKIM_DOMAIN,
+        keySelector: process.env.DKIM_SELECTOR,
+        privateKey: process.env.DKIM_PRIVATE_KEY
+      } : undefined,
+      // Add helpful headers to improve deliverability
+      headers: {
+        'X-Priority': '1 (Highest)',
+        'X-MSMail-Priority': 'High',
+        'Importance': 'High'
+      }
+    });
+    
+    // Format expiry date for email
+    const expiryDateFormatted = new Date(item.expiryDate).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+    
+    let subject, message;
+    const appName = process.env.APP_NAME || 'WasteNot';
+    
+    if (alertType === 'expired') {
+      // Email for expired items
+      subject = `${appName} Alert: Your ${item.name} has expired!`;
+      message = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eaeaea; border-radius: 8px; overflow: hidden;">
+          <div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center;">
+            <h1 style="margin: 0;">Food Item Expired</h1>
+          </div>
+          <div style="padding: 20px;">
+            <p>Hello ${user.name},</p>
+            <p>Your <strong>${item.name}</strong> has expired on <strong>${expiryDateFormatted}</strong>.</p>
+            <p>We recommend using or disposing of this item properly to maintain food safety.</p>
+            
+            <div style="background-color: #f8f8f8; border-left: 4px solid #e74c3c; padding: 15px; margin: 20px 0;">
+              <strong>Food Item Details:</strong><br>
+              Name: ${item.name}<br>
+              Expiry Date: ${expiryDateFormatted}<br>
+              ${item.storage ? `Storage: ${item.storage}<br>` : ''}
+              ${item.condition ? `Condition: ${item.condition}<br>` : ''}
+            </div>
+            
+            <p style="margin-top: 30px;">Thank you for using ${appName} to reduce food waste!</p>
+          </div>
+          <div style="background-color: #f5f5f5; padding: 15px; font-size: 12px; color: #666; border-top: 1px solid #eaeaea;">
+            <p>You received this email because you have alerts enabled in your ${appName} account.</p>
+            <p>To manage your notifications, log in to your account and go to the Settings page.</p>
+            <p>This is not a marketing email. It is an important notification about items in your inventory.</p>
+          </div>
+        </div>
+      `;
+    } else {
+      // Email for items expiring soon
+      const daysText = daysRemaining === 0 ? 'today' : 
+                      daysRemaining === 1 ? 'tomorrow' :
+                      `in ${daysRemaining} days`;
+      
+      subject = `${appName} Alert: Your ${item.name} expires ${daysText}!`;
+      message = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eaeaea; border-radius: 8px; overflow: hidden;">
+          <div style="background-color: #2196F3; color: white; padding: 20px; text-align: center;">
+            <h1 style="margin: 0;">Food Item Expiring Soon</h1>
+          </div>
+          <div style="padding: 20px;">
+            <p>Hello ${user.name},</p>
+            <p>Your <strong>${item.name}</strong> will expire ${daysText} (<strong>${expiryDateFormatted}</strong>).</p>
+            <p>To reduce food waste, consider using this item soon or finding a recipe that uses it.</p>
+            
+            <div style="background-color: #f8f8f8; border-left: 4px solid #3498db; padding: 15px; margin: 20px 0;">
+              <strong>Food Item Details:</strong><br>
+              Name: ${item.name}<br>
+              Expiry Date: ${expiryDateFormatted}<br>
+              Expiring: ${daysText}<br>
+              ${item.storage ? `Storage: ${item.storage}<br>` : ''}
+              ${item.condition ? `Condition: ${item.condition}<br>` : ''}
+            </div>
+            
+            <p style="margin-top: 30px;">Thank you for using ${appName} to reduce food waste!</p>
+          </div>
+          <div style="background-color: #f5f5f5; padding: 15px; font-size: 12px; color: #666; border-top: 1px solid #eaeaea;">
+            <p>You received this email because you have alerts enabled in your ${appName} account.</p>
+            <p>To manage your notifications, log in to your account and go to the Settings page.</p>
+            <p>This is not a marketing email. It is an important notification about items in your inventory.</p>
+          </div>
+        </div>
+      `;
+    }
+    
+    // Send email
+    await transporter.sendMail({
+      from: {
+        name: process.env.EMAIL_FROM_NAME || `${appName} App`,
+        address: process.env.EMAIL_USER
+      },
+      to: user.email,
+      subject: subject,
+      html: message,
+      // Add additional headers to reduce spam likelihood
+      priority: 'high',
+      headers: {
+        'List-Unsubscribe': `<${process.env.APP_URL || 'http://localhost:5173'}/settings>`,
+        'Precedence': 'bulk'
+      }
+    });
+    
+    console.log(`Alert email sent to ${user.email} for ${item.name} (${alertType === 'expired' ? 'expired on' : 'expires on'}: ${expiryDateFormatted})`);
+    
+    return true;
+  } catch (error) {
+    console.error('Error sending alert email:', error);
+    return false;
+  }
+};
+
+// Helper function to check if a food item is a dairy product
+const isDairyProduct = (foodName) => {
+  if (!foodName) return false;
+  const dairyTerms = ["milk", "yogurt", "curd", "cheese", "cream", "butter", "dairy"];
+  return dairyTerms.some(term => foodName.toLowerCase().includes(term));
+};
+
+// Helper function to check if a food item is a meat product
+const isMeatProduct = (foodName) => {
+  if (!foodName) return false;
+  const meatTerms = ["meat", "beef", "chicken", "pork", "fish", "lamb", "turkey", "seafood"];
+  return meatTerms.some(term => foodName.toLowerCase().includes(term));
+};
+
+// Helper function to determine food category from name
+const getCategoryFromName = (foodName) => {
+  if (!foodName) return 'other';
+  
+  foodName = foodName.toLowerCase();
+  
+  if (isDairyProduct(foodName)) return 'dairy';
+  if (isMeatProduct(foodName)) return 'meat';
+  
+  const produceTerms = ["apple", "banana", "orange", "tomato", "fruit", "vegetable", "salad"];
+  if (produceTerms.some(term => foodName.includes(term))) return 'produce';
+  
+  const bakedTerms = ["bread", "cake", "pastry", "pie", "cookie", "muffin"];
+  if (bakedTerms.some(term => foodName.includes(term))) return 'baked';
+  
+  const pantryTerms = ["rice", "pasta", "flour", "sugar", "can", "dried"];
+  if (pantryTerms.some(term => foodName.includes(term))) return 'pantry';
+  
+  return 'other';
+};
+
+module.exports = {
+  generateAlerts,
+  getUserAlerts,
+  markAlertAsRead,
+  clearAllAlerts
+};
