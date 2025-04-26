@@ -38,9 +38,9 @@ try {
   const cron = require('node-cron');
   const { generateAlerts } = require('./controllers/alertController');
   
-  // Schedule the generateAlerts function to run multiple times daily
-  // Run at midnight (0), 8AM, noon (12PM), and 6PM (18)
-  cron.schedule('0 0,8,12,18 * * *', async () => {
+  // For Render deployment - use less frequent checks to stay within free tier limits
+  // Run once at midnight (0) and noon (12) to reduce resource usage
+  cron.schedule('0 0,12 * * *', async () => {
     console.log('Running scheduled alert generation job...');
     
     try {
@@ -53,10 +53,15 @@ try {
     }
   });
   
-  console.log('Alert generation cron jobs scheduled to run at midnight, 8AM, noon, and 6PM daily');
+  console.log('Alert generation cron jobs scheduled to run at midnight and noon daily for Render deployment');
 } catch (error) {
   console.error('Error setting up cron job:', error.message);
 }
+
+// Keep Render from spinning down with a ping endpoint
+app.get('/ping', (req, res) => {
+  res.status(200).send('pong');
+});
 
 // Routes
 try {
