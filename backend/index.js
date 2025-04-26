@@ -33,31 +33,6 @@ try {
   console.error('Failed to connect to database:', error);
 }
 
-// Setup alert generation cron job
-try {
-  const cron = require('node-cron');
-  const { generateAlerts } = require('./controllers/alertController');
-  
-  // For Render deployment - use less frequent checks to stay within free tier limits
-  // Run once at midnight (0) and noon (12) to reduce resource usage
-  cron.schedule('0 0,12 * * *', async () => {
-    console.log('Running scheduled alert generation job...');
-    
-    try {
-      const result = await generateAlerts(null, null);
-      console.log('Alert generation completed!');
-      console.log(`Created ${result.alertsCreated} new alerts.`);
-      console.log(`Sent ${result.emailsSent} emails to users.`);
-    } catch (error) {
-      console.error('Error in scheduled alert generation:', error);
-    }
-  });
-  
-  console.log('Alert generation cron jobs scheduled to run at midnight and noon daily for Render deployment');
-} catch (error) {
-  console.error('Error setting up cron job:', error.message);
-}
-
 // Keep Render from spinning down with a ping endpoint
 app.get('/ping', (req, res) => {
   res.status(200).send('pong');
@@ -70,6 +45,7 @@ try {
   app.use('/api/recipes', require('./routes/recipeRoutes'));
   app.use('/api/alerts', require('./routes/alertRoutes'));
   app.use('/api/users', require('./routes/userRoutes'));
+  app.use('/api/cron', require('./routes/cronRoutes'));
   console.log('All routes registered successfully');
 } catch (error) {
   console.error('Error setting up routes:', error.message);

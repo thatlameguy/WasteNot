@@ -291,32 +291,40 @@ const generateAlerts = async (req, res) => {
       }
     }
     
-    // Return response if this was called from API
+    // Prepare result object with statistics
+    const result = {
+      alertsCreated,
+      emailsSent,
+      criticalItemsCount: criticalItems.length,
+      itemsExpiringTomorrowCount: itemsExpiringTomorrow.length,
+      totalItemsProcessed: items.length
+    };
+    
+    // If called from API route, send response
     if (res) {
-      res.status(200).json({
+      return res.status(200).json({
+        success: true,
         message: 'Alerts generated successfully',
-        alertsCreated,
-        emailsSent,
-        tomorrowItems: itemsExpiringTomorrow.length,
-        criticalItems: criticalItems.length
+        ...result
       });
     }
     
-    return {
-      alertsCreated,
-      emailsSent,
-      tomorrowItems: itemsExpiringTomorrow.length,
-      criticalItems: criticalItems.length
-    };
+    // If called programmatically (e.g. from cron job), return result
+    return result;
   } catch (error) {
     console.error('Error generating alerts:', error);
+    
+    // If called from API route, send error response
     if (res) {
-      res.status(500).json({ message: 'Server error', error: error.message });
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate alerts',
+        message: error.message
+      });
     }
     
-    return {
-      error: error.message
-    };
+    // If called programmatically, throw the error or return error object
+    throw error;
   }
 };
 

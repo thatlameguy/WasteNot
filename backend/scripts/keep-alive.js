@@ -5,7 +5,7 @@
 const https = require('https');
 const http = require('http');
 
-// Replace with your actual Render deployment URL
+// Replace with your actual Render deployment URL (without trailing slash)
 const appUrl = process.env.APP_URL || 'https://your-render-app-url.onrender.com';
 
 console.log(`Pinging ${appUrl}/ping to keep the service alive...`);
@@ -22,6 +22,9 @@ requester.get(`${appUrl}/ping`, (res) => {
   } else {
     console.error(`Failed to ping server. Status code: ${statusCode}`);
   }
+  
+  // Make sure to close the connection properly
+  res.resume();
 }).on('error', (err) => {
   console.error(`Error pinging server: ${err.message}`);
 }); 
