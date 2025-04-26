@@ -1,5 +1,6 @@
 import { useState } from "react";
 import logoIcon from "../assets/logo.ico";
+import { API_URL } from "../utils/api";
 
 const Signup = ({ onToggleForm }) => {
   const [name, setName] = useState("");
@@ -8,9 +9,6 @@ const Signup = ({ onToggleForm }) => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  // API URL for backend
-  const API_URL = "http://localhost:8000/api";
 
   const handleSubmit = async (e) => {
     e.preventDefault();
