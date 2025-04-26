@@ -6,7 +6,8 @@
     "start": "node index.js",
     "dev": "nodemon index.js",
     "generate-alerts": "node cron/generateAlerts.js",
-    "cron": "node cron/setupCronJobs.js"
+    "cron": "node cron/setupCronJobs.js",
+    "keep-alive": "node scripts/keep-alive.js"
   },
   "keywords": [],
   "author": "",
