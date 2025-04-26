@@ -1,3 +1,17 @@
+// API URL configuration
+const getApiUrl = () => {
+  // Check if we're in production (Vercel)
+  if (window.location.hostname !== 'localhost' && 
+      !window.location.hostname.includes('127.0.0.1')) {
+    return 'https://waste-not-backend.vercel.app/api';
+  }
+  
+  // Local development
+  return 'http://localhost:8000/api';
+};
+
+export const API_URL = getApiUrl();
+
 // Utility for making authenticated requests
 export const fetchWithAuth = async (url, options = {}) => {
     const token = localStorage.getItem("token");
