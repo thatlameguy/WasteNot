@@ -51,10 +51,10 @@ const RecipeSuggestions = ({ items, onSaveRecipe }) => {
               },
               {
                 role: "user",
-                content: `I have the following ingredients: ${ingredients.join(", ")}. Can you suggest 5 recipes that I can make with these ingredients? For each recipe, include the title, list of ingredients, cooking instructions, preparation time, and cooking time. Format the response as JSON with the following structure: { "recipes": [{ "title": "Recipe Title", "ingredients": ["ingredient1", "ingredient2", ...], "instructions": "Step by step instructions", "prepTime": "X mins", "cookTime": "Y mins", "matchedIngredients": ["matched1", "matched2", ...] }] }`
+                content: `I have the following ingredients: ${ingredients.join(", ")}. Can you suggest 5 recipes that I can make with these ingredients? For each recipe, include the title, list of ingredients, cooking instructions, preparation time, and cooking time. Please ensure variety and creativity in the recipes. Current timestamp: ${Date.now()}. Format the response as JSON with the following structure: { "recipes": [{ "title": "Recipe Title", "ingredients": ["ingredient1", "ingredient2", ...], "instructions": "Step by step instructions", "prepTime": "X mins", "cookTime": "Y mins", "matchedIngredients": ["matched1", "matched2", ...] }] }`
               }
             ],
-            temperature: 0.7,
+            temperature: 1.0,
             max_tokens: 4000,
             response_format: { type: "json_object" }
           })
