@@ -2086,7 +2086,7 @@ function App() {
       {showAddModal && (
         <AddItemModal onClose={() => setShowAddModal(false)} onAdd={addItem} />
       )}
-      <Analytics />
+      {/* <Analytics /> */}
     </div>
   )
 }
@@ -2099,3 +2099,4 @@ const isSameDay = (date1, date2) => {
          date1.getMonth() === date2.getMonth() &&
          date1.getDate() === date2.getDate();
 }
+<Analytics />
