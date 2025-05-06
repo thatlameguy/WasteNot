@@ -26,6 +26,7 @@ import "./styles/WhitelistInstructions.css"
 import ResetPassword from "./components/ResetPassword"
 import { Loader } from "lucide-react"
 import { API_URL } from './utils/api';
+import { Analytics } from '@vercel/analytics/react';
 
 function App() {
   // Get authentication state from AuthContext
@@ -2085,6 +2086,7 @@ function App() {
       {showAddModal && (
         <AddItemModal onClose={() => setShowAddModal(false)} onAdd={addItem} />
       )}
+      <Analytics />
     </div>
   )
 }
