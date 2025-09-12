@@ -1,5 +1,5 @@
 import React from 'react';
-import loginCover from '../assets/login-cover.jpg';
+import loginCover from '../assets/login-cover.webp';
 
 const AuthImage = () => {
   // This component doesn't render anything visible
