@@ -56,6 +56,37 @@ const Login = ({ onToggleForm, onForgotPassword }) => {
     }
   };
 
+  // Handle guest login
+  const handleGuestLogin = () => {
+    setError("");
+    setIsLoading(true);
+
+    try {
+      // Set guest mode flags
+      localStorage.setItem("isGuest", "true");
+      
+      // Create guest user data
+      const guestUser = {
+        id: 'guest_user',
+        name: 'Guest User',
+        email: 'guest@wastenot.app',
+        avatarId: 1,
+        avatar: null,
+        isGuest: true
+      };
+      
+      localStorage.setItem("user", JSON.stringify(guestUser));
+      
+      // Refresh the page to load guest mode
+      window.location.reload();
+    } catch (err) {
+      console.error("Guest login error:", err);
+      setError("An error occurred during guest login. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleSocialLogin = async (provider) => {
     setError(`${provider} login is not implemented yet.`);
   };
@@ -114,6 +145,32 @@ const Login = ({ onToggleForm, onForgotPassword }) => {
           {isLoading ? "Logging in..." : "Login"}
         </button>
       </form>
+
+      {/* Guest Mode Section */}
+      <div className="guest-login-section">
+        <div className="divider">
+          <span>or</span>
+        </div>
+        
+        <button 
+          className="guest-login-button"
+          onClick={handleGuestLogin}
+          disabled={isLoading}
+        >
+          {isLoading ? "Loading..." : "Try as Guest"}
+        </button>
+        
+        <div className="guest-features">
+          <h4>Guest Mode Features:</h4>
+          <ul>
+            <li>✅ Full dashboard experience</li>
+            <li>✅ Add, edit, and manage food items</li>
+            <li>✅ Get recipe suggestions</li>
+            <li>✅ View analytics and insights</li>
+            <li>✅ All data stays on your device</li>
+          </ul>
+        </div>
+      </div>
 
       <div className="social-login">
         <p>Or sign in with</p>
