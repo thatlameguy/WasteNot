@@ -141,9 +141,117 @@ function App() {
     }
   };
   
+  // Add this function to fetch food items from guest data service
+  const fetchGuestFoodItems = async () => {
+    try {
+      setLoading(true);
+      setFetchError("");
+      
+      console.log("Fetching guest food items...");
+      
+      // Import guest services dynamically to avoid issues
+      const { default: guestApiService } = await import('./services/guestApiService');
+      
+      // Fetch active food items
+      const activeItems = await guestApiService.getFoodItems();
+      console.log("Fetched guest active food items:", activeItems);
+      
+      // Convert date strings to Date objects for compatibility
+      const processedActiveItems = activeItems.map(item => ({
+        ...item,
+        expiryDate: new Date(item.expiryDate),
+        addedDate: new Date(item.addedDate),
+        removedDate: item.removedDate ? new Date(item.removedDate) : null
+      }));
+      
+      setItems(processedActiveItems);
+      
+      // Fetch consumed items
+      try {
+        const consumedItems = await guestApiService.getConsumedItems();
+        console.log("Fetched guest consumed items:", consumedItems);
+        
+        // Convert date strings to Date objects
+        const processedConsumedItems = consumedItems.map(item => ({
+          ...item,
+          expiryDate: new Date(item.expiryDate),
+          addedDate: new Date(item.addedDate),
+          removedDate: item.removedDate ? new Date(item.removedDate) : null
+        }));
+        
+        setConsumedItems(processedConsumedItems);
+      } catch (error) {
+        console.error("Error fetching guest consumed items:", error);
+      }
+      
+      // Fetch wasted items
+      try {
+        const wastedItems = await guestApiService.getWastedItems();
+        console.log("Fetched guest wasted items:", wastedItems);
+        
+        // Convert date strings to Date objects
+        const processedWastedItems = wastedItems.map(item => ({
+          ...item,
+          expiryDate: new Date(item.expiryDate),
+          addedDate: new Date(item.addedDate),
+          removedDate: item.removedDate ? new Date(item.removedDate) : null
+        }));
+        
+        setWastedItems(processedWastedItems);
+      } catch (error) {
+        console.error("Error fetching guest wasted items:", error);
+      }
+      
+      // Fetch deleted items
+      try {
+        const deletedItems = await guestApiService.getDeletedItems();
+        console.log("Fetched guest deleted items:", deletedItems);
+        
+        // Convert date strings to Date objects
+        const processedDeletedItems = deletedItems.map(item => ({
+          ...item,
+          expiryDate: new Date(item.expiryDate),
+          addedDate: new Date(item.addedDate),
+          removedDate: item.removedDate ? new Date(item.removedDate) : null
+        }));
+        
+        setDeletedItems(processedDeletedItems);
+      } catch (error) {
+        console.error("Error fetching guest deleted items:", error);
+      }
+      
+    } catch (error) {
+      console.error("Error fetching guest food items:", error);
+      setFetchError(error.message || "Failed to fetch guest food items");
+    } finally {
+      setLoading(false);
+    }
+  };
+  
   useEffect(() => {
     const verifyToken = async () => {
       const token = localStorage.getItem("token");
+      const isGuest = localStorage.getItem("isGuest");
+      
+      // Check if user is in guest mode
+      if (isGuest === "true") {
+        try {
+          const guestUser = JSON.parse(localStorage.getItem("user"));
+          if (guestUser && guestUser.isGuest) {
+            setUser(guestUser);
+            // Fetch guest food items
+            fetchGuestFoodItems();
+            return;
+          }
+        } catch (error) {
+          console.error("Error loading guest user data:", error);
+        }
+        // If guest data is corrupted, clear it and show auth
+        localStorage.removeItem("isGuest");
+        localStorage.removeItem("user");
+        setLoading(false);
+        return;
+      }
       
       if (!token) {
         setLoading(false);
@@ -386,8 +494,32 @@ function App() {
     return 'var(--danger-color)'
   }
 
-  const addItem = (newItem) => {
-    setItems(prevItems => [...prevItems, newItem]);
+  const addItem = async (newItem) => {
+    const isGuest = localStorage.getItem("isGuest") === "true";
+    
+    if (isGuest) {
+      // Use guest API service
+      try {
+        const { default: guestApiService } = await import('./services/guestApiService');
+        const result = await guestApiService.addFoodItem(newItem);
+        if (result.success) {
+          // Convert date strings to Date objects for compatibility
+          const processedItem = {
+            ...result.item,
+            expiryDate: new Date(result.item.expiryDate),
+            addedDate: new Date(result.item.addedDate),
+            removedDate: result.item.removedDate ? new Date(result.item.removedDate) : null
+          };
+          setItems(prevItems => [...prevItems, processedItem]);
+        }
+      } catch (error) {
+        console.error("Error adding item in guest mode:", error);
+        alert("Error adding item. Please try again.");
+      }
+    } else {
+      // Use regular state update for now (backend integration would be added here)
+      setItems(prevItems => [...prevItems, newItem]);
+    }
   }
 
   // Handle card size change
@@ -401,44 +533,73 @@ function App() {
   }
 
   // Handle actions on items (consume, extend expiry, mark as wasted)
-  const handleItemAction = (itemId, action, additionalData) => {
+  const handleItemAction = async (itemId, action, additionalData) => {
+    const isGuest = localStorage.getItem("isGuest") === "true";
+    
     switch (action) {
       case 'consumed':
         // Find the item to be consumed
         const itemToConsume = items.find(item => (item._id === itemId || item.id === itemId));
         if (itemToConsume) {
-          const token = localStorage.getItem("token");
-          // Update the backend
-          fetch(`${API_URL}/food-items/${itemToConsume._id || itemToConsume.id}/status`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify({ status: "consumed", removedDate: new Date() })
-          })
-          .then(response => {
-            if (response.ok) {
-              return response.json();
-            } else {
-              throw new Error("Failed to update item status");
+          if (isGuest) {
+            // Use guest API service
+            try {
+              const { default: guestApiService } = await import('./services/guestApiService');
+              const result = await guestApiService.updateFoodItemStatus(itemToConsume.id, 'consumed');
+              if (result.success) {
+                // Convert date strings to Date objects
+                const processedItem = {
+                  ...result.item,
+                  expiryDate: new Date(result.item.expiryDate),
+                  addedDate: new Date(result.item.addedDate),
+                  removedDate: result.item.removedDate ? new Date(result.item.removedDate) : null
+                };
+                // Add the item to consumed items with timestamp
+                setConsumedItems(prev => [...prev, processedItem]);
+                // Remove from active items
+                setItems(prev => prev.filter(item => 
+                  (item._id !== itemId && item.id !== itemId)
+                ));
+              }
+            } catch (error) {
+              console.error("Error updating item status in guest mode:", error);
+              alert("Error updating item status. Please try again.");
             }
-          })
-          .then(data => {
-          // Add the item to consumed items with timestamp
-            setConsumedItems(prev => [...prev, {
-            ...itemToConsume,
-            removedDate: new Date()
-          }]);
-          // Remove from active items
-            setItems(prev => prev.filter(item => 
-              (item._id !== itemId && item.id !== itemId)
-            ));
-          })
-          .catch(error => {
-            console.error("Error updating item status:", error);
-            alert("Error updating item status. Please try again.");
-          });
+          } else {
+            // Use regular API
+            const token = localStorage.getItem("token");
+            // Update the backend
+            fetch(`${API_URL}/food-items/${itemToConsume._id || itemToConsume.id}/status`, {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              },
+              body: JSON.stringify({ status: "consumed", removedDate: new Date() })
+            })
+            .then(response => {
+              if (response.ok) {
+                return response.json();
+              } else {
+                throw new Error("Failed to update item status");
+              }
+            })
+            .then(data => {
+            // Add the item to consumed items with timestamp
+              setConsumedItems(prev => [...prev, {
+              ...itemToConsume,
+              removedDate: new Date()
+            }]);
+            // Remove from active items
+              setItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+            })
+            .catch(error => {
+              console.error("Error updating item status:", error);
+              alert("Error updating item status. Please try again.");
+            });
+          }
         }
         break;
       
@@ -447,38 +608,65 @@ function App() {
         const itemToExtend = items.find(item => (item._id === itemId || item.id === itemId));
         if (itemToExtend) {
           const newExpiryDate = new Date(itemToExtend.expiryDate);
-            newExpiryDate.setDate(newExpiryDate.getDate() + 1);
-            
-          const token = localStorage.getItem("token");
-          // Update the backend
-          fetch(`${API_URL}/food-items/${itemToExtend._id || itemToExtend.id}`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify({ expiryDate: newExpiryDate })
-          })
-          .then(response => {
-            if (response.ok) {
-              // Update local state
-              setItems(items.map(item => {
-                if (item._id === itemId || item.id === itemId) {
-            return {
-              ...item,
-              expiryDate: newExpiryDate
-            };
-          }
-          return item;
-        }));
-            } else {
-              alert("Failed to extend expiry date. Please try again.");
+          newExpiryDate.setDate(newExpiryDate.getDate() + 1);
+          
+          if (isGuest) {
+            // Use guest API service
+            try {
+              const { default: guestApiService } = await import('./services/guestApiService');
+              const result = await guestApiService.updateFoodItem(itemToExtend.id, { expiryDate: newExpiryDate });
+              if (result.success) {
+                // Convert date strings to Date objects
+                const processedItem = {
+                  ...result.item,
+                  expiryDate: new Date(result.item.expiryDate),
+                  addedDate: new Date(result.item.addedDate),
+                  removedDate: result.item.removedDate ? new Date(result.item.removedDate) : null
+                };
+                // Update local state
+                setItems(items.map(item => {
+                  if (item._id === itemId || item.id === itemId) {
+                    return processedItem;
+                  }
+                  return item;
+                }));
+              }
+            } catch (error) {
+              console.error("Error extending expiry date in guest mode:", error);
+              alert("Error extending expiry date. Please try again.");
             }
-          })
-          .catch(error => {
-            console.error("Error extending expiry date:", error);
-            alert("Error extending expiry date. Please try again.");
-          });
+          } else {
+            const token = localStorage.getItem("token");
+            // Update the backend
+            fetch(`${API_URL}/food-items/${itemToExtend._id || itemToExtend.id}`, {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              },
+              body: JSON.stringify({ expiryDate: newExpiryDate })
+            })
+            .then(response => {
+              if (response.ok) {
+                // Update local state
+                setItems(items.map(item => {
+                  if (item._id === itemId || item.id === itemId) {
+                return {
+                  ...item,
+                  expiryDate: newExpiryDate
+                };
+              }
+              return item;
+            }));
+              } else {
+                alert("Failed to extend expiry date. Please try again.");
+              }
+            })
+            .catch(error => {
+              console.error("Error extending expiry date:", error);
+              alert("Error extending expiry date. Please try again.");
+            });
+          }
         }
         break;
       
@@ -502,36 +690,63 @@ function App() {
             
             // Check if the date is valid
             if (!isNaN(newDate.getTime())) {
-              const token = localStorage.getItem("token");
-              // Update the backend
-              fetch(`${API_URL}/food-items/${itemToEdit._id || itemToEdit.id}`, {
-                method: "PUT",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ expiryDate: newDate })
-              })
-              .then(response => {
-                if (response.ok) {
-              // Update the item with the new expiry date
-              setItems(items.map(item => {
-                    if (item._id === itemId || item.id === itemId) {
-                  return {
-                    ...item,
-                    expiryDate: newDate
-                  };
+              if (isGuest) {
+                // Use guest API service
+                try {
+                  const { default: guestApiService } = await import('./services/guestApiService');
+                  const result = await guestApiService.updateFoodItem(itemToEdit.id, { expiryDate: newDate });
+                  if (result.success) {
+                    // Convert date strings to Date objects
+                    const processedItem = {
+                      ...result.item,
+                      expiryDate: new Date(result.item.expiryDate),
+                      addedDate: new Date(result.item.addedDate),
+                      removedDate: result.item.removedDate ? new Date(result.item.removedDate) : null
+                    };
+                    // Update the item with the new expiry date
+                    setItems(items.map(item => {
+                      if (item._id === itemId || item.id === itemId) {
+                        return processedItem;
+                      }
+                      return item;
+                    }));
+                  }
+                } catch (error) {
+                  console.error("Error updating expiry date in guest mode:", error);
+                  alert("Error updating expiry date. Please try again.");
                 }
-                return item;
-              }));
-                } else {
-                  alert("Failed to update expiry date. Please try again.");
-                }
-              })
-              .catch(error => {
-                console.error("Error updating expiry date:", error);
-                alert("Error updating expiry date. Please try again.");
-              });
+              } else {
+                const token = localStorage.getItem("token");
+                // Update the backend
+                fetch(`${API_URL}/food-items/${itemToEdit._id || itemToEdit.id}`, {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ expiryDate: newDate })
+                })
+                .then(response => {
+                  if (response.ok) {
+                // Update the item with the new expiry date
+                setItems(items.map(item => {
+                      if (item._id === itemId || item.id === itemId) {
+                    return {
+                      ...item,
+                      expiryDate: newDate
+                    };
+                  }
+                  return item;
+                }));
+                  } else {
+                    alert("Failed to update expiry date. Please try again.");
+                  }
+                })
+                .catch(error => {
+                  console.error("Error updating expiry date:", error);
+                  alert("Error updating expiry date. Please try again.");
+                });
+              }
             }
           }
         }
@@ -602,21 +817,51 @@ function App() {
               }));
               
               // Submit updated storage to backend
-              const token = localStorage.getItem("token");
-              fetch(`${API_URL}/food-items/${itemId}`, {
-                method: "PUT",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ 
-                  storage: newStorage,
-                  freshness: items.find(item => (item._id === itemId || item.id === itemId)).freshness
+              if (isGuest) {
+                // Use guest API service
+                try {
+                  const { default: guestApiService } = await import('./services/guestApiService');
+                  const updatedItem = items.find(item => (item._id === itemId || item.id === itemId));
+                  const result = await guestApiService.updateFoodItem(updatedItem.id, { 
+                    storage: newStorage,
+                    freshness: updatedItem.freshness
+                  });
+                  if (result.success) {
+                    // Convert date strings to Date objects
+                    const processedItem = {
+                      ...result.item,
+                      expiryDate: new Date(result.item.expiryDate),
+                      addedDate: new Date(result.item.addedDate),
+                      removedDate: result.item.removedDate ? new Date(result.item.removedDate) : null
+                    };
+                    // Update the item with the new storage
+                    setItems(items.map(item => {
+                      if (item._id === itemId || item.id === itemId) {
+                        return processedItem;
+                      }
+                      return item;
+                    }));
+                  }
+                } catch (error) {
+                  console.error("Error updating storage in guest mode:", error);
+                }
+              } else {
+                const token = localStorage.getItem("token");
+                fetch(`${API_URL}/food-items/${itemId}`, {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ 
+                    storage: newStorage,
+                    freshness: items.find(item => (item._id === itemId || item.id === itemId)).freshness
+                  })
                 })
-              })
-              .catch(error => {
-                console.error("Error updating storage in backend:", error);
-              });
+                .catch(error => {
+                  console.error("Error updating storage in backend:", error);
+                });
+              }
               
               // Alert user about the effect of the storage change
               let messageEffect = "";
@@ -702,21 +947,51 @@ function App() {
               }));
               
               // Submit updated condition to backend
-              const token = localStorage.getItem("token");
-              fetch(`${API_URL}/food-items/${itemId}`, {
-                method: "PUT",
-                headers: {
-                  "Content-Type": "application/json",
-                  "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({ 
-                  condition: newCondition,
-                  freshness: items.find(item => (item._id === itemId || item.id === itemId)).freshness
+              if (isGuest) {
+                // Use guest API service
+                try {
+                  const { default: guestApiService } = await import('./services/guestApiService');
+                  const updatedItem = items.find(item => (item._id === itemId || item.id === itemId));
+                  const result = await guestApiService.updateFoodItem(updatedItem.id, { 
+                    condition: newCondition,
+                    freshness: updatedItem.freshness
+                  });
+                  if (result.success) {
+                    // Convert date strings to Date objects
+                    const processedItem = {
+                      ...result.item,
+                      expiryDate: new Date(result.item.expiryDate),
+                      addedDate: new Date(result.item.addedDate),
+                      removedDate: result.item.removedDate ? new Date(result.item.removedDate) : null
+                    };
+                    // Update the item with the new condition
+                    setItems(items.map(item => {
+                      if (item._id === itemId || item.id === itemId) {
+                        return processedItem;
+                      }
+                      return item;
+                    }));
+                  }
+                } catch (error) {
+                  console.error("Error updating condition in guest mode:", error);
+                }
+              } else {
+                const token = localStorage.getItem("token");
+                fetch(`${API_URL}/food-items/${itemId}`, {
+                  method: "PUT",
+                  headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                  },
+                  body: JSON.stringify({ 
+                    condition: newCondition,
+                    freshness: items.find(item => (item._id === itemId || item.id === itemId)).freshness
+                  })
                 })
-              })
-              .catch(error => {
-                console.error("Error updating condition in backend:", error);
-              });
+                .catch(error => {
+                  console.error("Error updating condition in backend:", error);
+                });
+              }
               
               // Alert user about effect of condition change
               if (newCondition === "Freshly bought") {
@@ -735,38 +1010,65 @@ function App() {
         // Find the item to be marked as wasted
         const itemToWaste = items.find(item => (item._id === itemId || item.id === itemId));
         if (itemToWaste) {
-          const token = localStorage.getItem("token");
-          // Update the backend
-          fetch(`${API_URL}/food-items/${itemToWaste._id || itemToWaste.id}/status`, {
-            method: "PUT",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": `Bearer ${token}`
-            },
-            body: JSON.stringify({ status: "wasted", removedDate: new Date() })
-          })
-          .then(response => {
-            if (response.ok) {
-              return response.json();
-            } else {
-              throw new Error("Failed to update item status");
+          if (isGuest) {
+            // Use guest API service
+            try {
+              const { default: guestApiService } = await import('./services/guestApiService');
+              const result = await guestApiService.updateFoodItemStatus(itemToWaste.id, 'wasted');
+              if (result.success) {
+                // Convert date strings to Date objects
+                const processedItem = {
+                  ...result.item,
+                  expiryDate: new Date(result.item.expiryDate),
+                  addedDate: new Date(result.item.addedDate),
+                  removedDate: result.item.removedDate ? new Date(result.item.removedDate) : null
+                };
+                // Add the item to wasted items with timestamp
+                setWastedItems(prev => [...prev, processedItem]);
+                // Remove from active items
+                setItems(prev => prev.filter(item => 
+                  (item._id !== itemId && item.id !== itemId)
+                ));
+              }
+            } catch (error) {
+              console.error("Error updating item status in guest mode:", error);
+              alert("Error updating item status. Please try again.");
             }
-          })
-          .then(data => {
-          // Add the item to wasted items with timestamp
-            setWastedItems(prev => [...prev, {
-            ...itemToWaste,
-            removedDate: new Date()
-          }]);
-          // Remove from active items
-            setItems(prev => prev.filter(item => 
-              (item._id !== itemId && item.id !== itemId)
-            ));
-          })
-          .catch(error => {
-            console.error("Error updating item status:", error);
-            alert("Error updating item status. Please try again.");
-          });
+          } else {
+            // Use regular API
+            const token = localStorage.getItem("token");
+            // Update the backend
+            fetch(`${API_URL}/food-items/${itemToWaste._id || itemToWaste.id}/status`, {
+              method: "PUT",
+              headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+              },
+              body: JSON.stringify({ status: "wasted", removedDate: new Date() })
+            })
+            .then(response => {
+              if (response.ok) {
+                return response.json();
+              } else {
+                throw new Error("Failed to update item status");
+              }
+            })
+            .then(data => {
+            // Add the item to wasted items with timestamp
+              setWastedItems(prev => [...prev, {
+              ...itemToWaste,
+              removedDate: new Date()
+            }]);
+            // Remove from active items
+              setItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+            })
+            .catch(error => {
+              console.error("Error updating item status:", error);
+              alert("Error updating item status. Please try again.");
+            });
+          }
         }
         break;
       
@@ -822,64 +1124,89 @@ function App() {
           if (itemToDelete) {
             if (window.confirm(`Are you sure you want to delete ${itemToDelete.name}?`)) {
               try {
-                const token = localStorage.getItem("token");
-                const itemIdToUse = itemToDelete._id || itemToDelete.id;
-                console.log("Attempting to move item to deleted:", itemIdToUse);
-                
-                // Update item status to "deleted" in backend
-                const response = await fetch(`${API_URL}/food-items/${itemIdToUse}/status`, {
-                  method: "PUT",
-                  headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                  },
-                  body: JSON.stringify({ status: "deleted", removedDate: new Date() })
-                });
-
-                if (!response.ok) {
-                  const errorText = await response.text();
-                  console.error("Error response when setting item to deleted:", errorText);
-                  let errorMessage = "Failed to update item status";
-                  
-                  try {
-                    const errorData = JSON.parse(errorText);
-                    errorMessage = errorData.message || errorMessage;
-                  } catch (e) {
-                    if (errorText) errorMessage = errorText;
+                if (isGuest) {
+                  // Use guest API service
+                  const { default: guestApiService } = await import('./services/guestApiService');
+                  const result = await guestApiService.updateFoodItemStatus(itemToDelete.id, 'deleted');
+                  if (result.success) {
+                    // Convert date strings to Date objects
+                    const processedItem = {
+                      ...result.item,
+                      expiryDate: new Date(result.item.expiryDate),
+                      addedDate: new Date(result.item.addedDate),
+                      removedDate: result.item.removedDate ? new Date(result.item.removedDate) : null
+                    };
+                    // Add the returned item to deleted items
+                    setDeletedItems(prev => [...prev, processedItem]);
+                    
+                    // Remove from active items
+                    setItems(prev => prev.filter(item => 
+                      (item._id !== itemId && item.id !== itemId)
+                    ));
+                    
+                    alert(`${itemToDelete.name} has been deleted from your inventory.`);
                   }
-                  
-                  throw new Error(errorMessage);
-                }
-                
-                const data = await response.json();
-                console.log("Item moved to deleted successfully:", data);
-                
-                // Add the returned item to deleted items
-                setDeletedItems(prev => [...prev, data]);
-                
-                // Remove from active items
-                setItems(prev => prev.filter(item => 
-                  (item._id !== itemId && item.id !== itemId)
-                ));
-                
-                // Fetch all deleted items to ensure state is in sync
-                const deletedResponse = await fetch(`${API_URL}/food-items/deleted`, {
-                  method: "GET",
-                  headers: {
-                    "Authorization": `Bearer ${token}`,
-                    "Content-Type": "application/json"
-                  }
-                });
-                
-                if (deletedResponse.ok) {
-                  const deletedData = await deletedResponse.json();
-                  console.log("Updated deleted items:", deletedData);
-                  setDeletedItems(deletedData);
                 } else {
-                  console.error("Error fetching updated deleted items");
+                  // Use regular API
+                  const token = localStorage.getItem("token");
+                  const itemIdToUse = itemToDelete._id || itemToDelete.id;
+                  console.log("Attempting to move item to deleted:", itemIdToUse);
+                  
+                  // Update item status to "deleted" in backend
+                  const response = await fetch(`${API_URL}/food-items/${itemIdToUse}/status`, {
+                    method: "PUT",
+                    headers: {
+                      "Content-Type": "application/json",
+                      "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ status: "deleted", removedDate: new Date() })
+                  });
+
+                  if (!response.ok) {
+                    const errorText = await response.text();
+                    console.error("Error response when setting item to deleted:", errorText);
+                    let errorMessage = "Failed to update item status";
+                    
+                    try {
+                      const errorData = JSON.parse(errorText);
+                      errorMessage = errorData.message || errorMessage;
+                    } catch (e) {
+                      if (errorText) errorMessage = errorText;
+                    }
+                    
+                    throw new Error(errorMessage);
+                  }
+                  
+                  const data = await response.json();
+                  console.log("Item moved to deleted successfully:", data);
+                  
+                  // Add the returned item to deleted items
+                  setDeletedItems(prev => [...prev, data]);
+                  
+                  // Remove from active items
+                  setItems(prev => prev.filter(item => 
+                    (item._id !== itemId && item.id !== itemId)
+                  ));
+                  
+                  // Fetch all deleted items to ensure state is in sync
+                  const deletedResponse = await fetch(`${API_URL}/food-items/deleted`, {
+                    method: "GET",
+                    headers: {
+                      "Authorization": `Bearer ${token}`,
+                      "Content-Type": "application/json"
+                    }
+                  });
+                  
+                  if (deletedResponse.ok) {
+                    const deletedData = await deletedResponse.json();
+                    console.log("Updated deleted items:", deletedData);
+                    setDeletedItems(deletedData);
+                  } else {
+                    console.error("Error fetching updated deleted items");
+                  }
+                  
+                  alert(`${itemToDelete.name} has been deleted from your inventory.`);
                 }
-                
-                alert(`${itemToDelete.name} has been deleted from your inventory.`);
               } catch (error) {
                 console.error("Error updating item status:", error);
                 alert(`Error deleting item: ${error.message}. Please try again.`);
@@ -895,187 +1222,317 @@ function App() {
   }
 
   // Function to restore items from consumed, wasted, or deleted lists
-  const handleRestoreItem = (itemId, source) => {
+  const handleRestoreItem = async (itemId, source) => {
+    const isGuest = localStorage.getItem("isGuest") === "true";
     const token = localStorage.getItem("token");
     
     if (source === 'consumed') {
       const itemToRestore = consumedItems.find(item => (item._id === itemId || item.id === itemId));
       if (itemToRestore) {
-        // Update the backend
-        fetch(`${API_URL}/food-items/${itemToRestore._id || itemToRestore.id}/restore`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
+        if (isGuest) {
+          // Use guest API service
+          try {
+            const { default: guestApiService } = await import('./services/guestApiService');
+            const result = await guestApiService.restoreFoodItem(itemToRestore.id);
+            if (result.success) {
+              // Convert date strings to Date objects
+              const processedItem = {
+                ...result.item,
+                expiryDate: new Date(result.item.expiryDate),
+                addedDate: new Date(result.item.addedDate),
+                removedDate: result.item.removedDate ? new Date(result.item.removedDate) : null
+              };
+              // Add back to active items (without the removedDate field)
+              const { removedDate, ...restoredItem } = processedItem;
+              setItems([...items, restoredItem]);
+              // Remove from consumed items
+              setConsumedItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+            }
+          } catch (error) {
+            console.error("Error restoring item in guest mode:", error);
+            alert("Error restoring item. Please try again.");
           }
-        })
-        .then(response => {
-          if (response.ok) {
-        // Add back to active items (without the removedDate field)
-        const { removedDate, ...restoredItem } = itemToRestore;
-        setItems([...items, restoredItem]);
-        // Remove from consumed items
-            setConsumedItems(prev => prev.filter(item => 
-              (item._id !== itemId && item.id !== itemId)
-            ));
-          } else {
-            alert("Failed to restore item. Please try again.");
-          }
-        })
-        .catch(error => {
-          console.error("Error restoring item:", error);
-          alert("Error restoring item. Please try again.");
-        });
+        } else {
+          // Update the backend
+          fetch(`${API_URL}/food-items/${itemToRestore._id || itemToRestore.id}/restore`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            }
+          })
+          .then(response => {
+            if (response.ok) {
+          // Add back to active items (without the removedDate field)
+          const { removedDate, ...restoredItem } = itemToRestore;
+          setItems([...items, restoredItem]);
+          // Remove from consumed items
+              setConsumedItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+            } else {
+              alert("Failed to restore item. Please try again.");
+            }
+          })
+          .catch(error => {
+            console.error("Error restoring item:", error);
+            alert("Error restoring item. Please try again.");
+          });
+        }
       }
     } else if (source === 'wasted') {
       const itemToRestore = wastedItems.find(item => (item._id === itemId || item.id === itemId));
       if (itemToRestore) {
-        // Update the backend
-        fetch(`${API_URL}/food-items/${itemToRestore._id || itemToRestore.id}/restore`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
+        if (isGuest) {
+          // Use guest API service
+          try {
+            const { default: guestApiService } = await import('./services/guestApiService');
+            const result = await guestApiService.restoreFoodItem(itemToRestore.id);
+            if (result.success) {
+              // Convert date strings to Date objects
+              const processedItem = {
+                ...result.item,
+                expiryDate: new Date(result.item.expiryDate),
+                addedDate: new Date(result.item.addedDate),
+                removedDate: result.item.removedDate ? new Date(result.item.removedDate) : null
+              };
+              // Add back to active items (without the removedDate field)
+              const { removedDate, ...restoredItem } = processedItem;
+              setItems([...items, restoredItem]);
+              // Remove from wasted items
+              setWastedItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+            }
+          } catch (error) {
+            console.error("Error restoring item in guest mode:", error);
+            alert("Error restoring item. Please try again.");
           }
-        })
-        .then(response => {
-          if (response.ok) {
-        // Add back to active items (without the removedDate field)
-        const { removedDate, ...restoredItem } = itemToRestore;
-        setItems([...items, restoredItem]);
-        // Remove from wasted items
-            setWastedItems(prev => prev.filter(item => 
-              (item._id !== itemId && item.id !== itemId)
-            ));
-          } else {
-            alert("Failed to restore item. Please try again.");
-          }
-        })
-        .catch(error => {
-          console.error("Error restoring item:", error);
-          alert("Error restoring item. Please try again.");
-        });
+        } else {
+          // Update the backend
+          fetch(`${API_URL}/food-items/${itemToRestore._id || itemToRestore.id}/restore`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            }
+          })
+          .then(response => {
+            if (response.ok) {
+          // Add back to active items (without the removedDate field)
+          const { removedDate, ...restoredItem } = itemToRestore;
+          setItems([...items, restoredItem]);
+          // Remove from wasted items
+              setWastedItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+            } else {
+              alert("Failed to restore item. Please try again.");
+            }
+          })
+          .catch(error => {
+            console.error("Error restoring item:", error);
+            alert("Error restoring item. Please try again.");
+          });
+        }
       }
     } else if (source === 'deleted') {
       const itemToRestore = deletedItems.find(item => (item._id === itemId || item.id === itemId));
       if (itemToRestore) {
-        // Update the backend
-        fetch(`${API_URL}/food-items/${itemToRestore._id || itemToRestore.id}/restore`, {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
+        if (isGuest) {
+          // Use guest API service
+          try {
+            const { default: guestApiService } = await import('./services/guestApiService');
+            const result = await guestApiService.restoreFoodItem(itemToRestore.id);
+            if (result.success) {
+              // Convert date strings to Date objects
+              const processedItem = {
+                ...result.item,
+                expiryDate: new Date(result.item.expiryDate),
+                addedDate: new Date(result.item.addedDate),
+                removedDate: result.item.removedDate ? new Date(result.item.removedDate) : null
+              };
+              // Add back to active items (without the removedDate field)
+              const { removedDate, ...restoredItem } = processedItem;
+              setItems([...items, restoredItem]);
+              // Remove from deleted items
+              setDeletedItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+            }
+          } catch (error) {
+            console.error("Error restoring item in guest mode:", error);
+            alert("Error restoring item. Please try again.");
           }
-        })
-        .then(response => {
-          if (response.ok) {
-            // Add back to active items (without the removedDate field)
-            const { removedDate, ...restoredItem } = itemToRestore;
-            setItems([...items, restoredItem]);
-            // Remove from deleted items
-            setDeletedItems(prev => prev.filter(item => 
-              (item._id !== itemId && item.id !== itemId)
-            ));
-          } else {
-            alert("Failed to restore item. Please try again.");
-          }
-        })
-        .catch(error => {
-          console.error("Error restoring item:", error);
-          alert("Error restoring item. Please try again.");
-        });
+        } else {
+          // Update the backend
+          fetch(`${API_URL}/food-items/${itemToRestore._id || itemToRestore.id}/restore`, {
+            method: "PUT",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${token}`
+            }
+          })
+          .then(response => {
+            if (response.ok) {
+              // Add back to active items (without the removedDate field)
+              const { removedDate, ...restoredItem } = itemToRestore;
+              setItems([...items, restoredItem]);
+              // Remove from deleted items
+              setDeletedItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+            } else {
+              alert("Failed to restore item. Please try again.");
+            }
+          })
+          .catch(error => {
+            console.error("Error restoring item:", error);
+            alert("Error restoring item. Please try again.");
+          });
+        }
       }
     }
   }
 
   // Function to permanently delete items from consumed, wasted, or deleted lists
-  const handleDeleteItem = (itemId, source) => {
+  const handleDeleteItem = async (itemId, source) => {
+    const isGuest = localStorage.getItem("isGuest") === "true";
     const token = localStorage.getItem("token");
     
     if (source === 'consumed') {
       const itemToDelete = consumedItems.find(item => (item._id === itemId || item.id === itemId));
       if (itemToDelete) {
-        // Delete from backend
-        fetch(`${API_URL}/food-items/${itemToDelete._id || itemToDelete.id}`, {
-          method: "DELETE",
-          headers: {
-            "Authorization": `Bearer ${token}`
+        if (isGuest) {
+          // Use guest API service - permanently delete from consumed items
+          try {
+            const { default: guestApiService } = await import('./services/guestApiService');
+            const result = await guestApiService.permanentlyDeleteFoodItem(itemToDelete.id);
+            if (result.success) {
+              // Remove from consumed items in UI
+              setConsumedItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+              alert(`${itemToDelete.name} has been permanently deleted.`);
+            }
+          } catch (error) {
+            console.error("Error deleting item in guest mode:", error);
+            alert("Error deleting item. Please try again.");
           }
-        })
-        .then(response => {
-          if (response.ok) {
-            // Remove from consumed items in UI
-            setConsumedItems(prev => prev.filter(item => 
-              (item._id !== itemId && item.id !== itemId)
-            ));
-          } else {
-            return response.json().then(data => {
-              throw new Error(data.message || "Failed to delete item");
-            }).catch(() => {
-              throw new Error("Failed to delete item");
-            });
-          }
-        })
-        .catch(error => {
-          console.error("Error deleting item:", error);
-          alert("Error deleting item. Please try again.");
-        });
+        } else {
+          // Delete from backend
+          fetch(`${API_URL}/food-items/${itemToDelete._id || itemToDelete.id}`, {
+            method: "DELETE",
+            headers: {
+              "Authorization": `Bearer ${token}`
+            }
+          })
+          .then(response => {
+            if (response.ok) {
+              // Remove from consumed items in UI
+              setConsumedItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+            } else {
+              return response.json().then(data => {
+                throw new Error(data.message || "Failed to delete item");
+              }).catch(() => {
+                throw new Error("Failed to delete item");
+              });
+            }
+          })
+          .catch(error => {
+            console.error("Error deleting item:", error);
+            alert("Error deleting item. Please try again.");
+          });
+        }
       }
     } else if (source === 'wasted') {
       const itemToDelete = wastedItems.find(item => (item._id === itemId || item.id === itemId));
       if (itemToDelete) {
-        // Delete from backend
-        fetch(`${API_URL}/food-items/${itemToDelete._id || itemToDelete.id}`, {
-          method: "DELETE",
-          headers: {
-            "Authorization": `Bearer ${token}`
+        if (isGuest) {
+          // Use guest API service - permanently delete from wasted items
+          try {
+            const { default: guestApiService } = await import('./services/guestApiService');
+            const result = await guestApiService.permanentlyDeleteFoodItem(itemToDelete.id);
+            if (result.success) {
+              // Remove from wasted items in UI
+              setWastedItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+              alert(`${itemToDelete.name} has been permanently deleted.`);
+            }
+          } catch (error) {
+            console.error("Error deleting item in guest mode:", error);
+            alert("Error deleting item. Please try again.");
           }
-        })
-        .then(response => {
-          if (response.ok) {
-            // Remove from wasted items in UI
-            setWastedItems(prev => prev.filter(item => 
-              (item._id !== itemId && item.id !== itemId)
-            ));
-          } else {
-            return response.json().then(data => {
-              throw new Error(data.message || "Failed to delete item");
-            }).catch(() => {
-              throw new Error("Failed to delete item");
-            });
-          }
-        })
-        .catch(error => {
-          console.error("Error deleting item:", error);
-          alert("Error deleting item. Please try again.");
-        });
+        } else {
+          // Delete from backend
+          fetch(`${API_URL}/food-items/${itemToDelete._id || itemToDelete.id}`, {
+            method: "DELETE",
+            headers: {
+              "Authorization": `Bearer ${token}`
+            }
+          })
+          .then(response => {
+            if (response.ok) {
+              // Remove from wasted items in UI
+              setWastedItems(prev => prev.filter(item => 
+                (item._id !== itemId && item.id !== itemId)
+              ));
+            } else {
+              return response.json().then(data => {
+                throw new Error(data.message || "Failed to delete item");
+              }).catch(() => {
+                throw new Error("Failed to delete item");
+              });
+            }
+          })
+          .catch(error => {
+            console.error("Error deleting item:", error);
+            alert("Error deleting item. Please try again.");
+          });
+        }
       }
     } else if (source === 'deleted') {
-      (async () => {
-        console.log("Attempting to permanently delete item with ID:", itemId);
-        
-        // Find the item by ID to confirm it exists
-        const itemToDelete = deletedItems.find(item => 
-          (item._id === itemId || item.id === itemId)
-        );
-        
-        if (!itemToDelete) {
-          console.error("Item not found in deleted items:", itemId);
-          console.log("Available deleted items:", deletedItems);
-          alert("Error: Item not found. Please refresh the page and try again.");
-          return;
-        }
-        
-        console.log("Found item to delete:", itemToDelete);
-        
-        if (!window.confirm(`Are you sure you want to PERMANENTLY delete ${itemToDelete.name}? This cannot be undone.`)) {
-          return; // User cancelled
-        }
-        
-        const itemIdToUse = itemToDelete._id || itemToDelete.id;
-        console.log("Using ID for deletion:", itemIdToUse);
-        
-        try {
+      console.log("Attempting to permanently delete item with ID:", itemId);
+      
+      // Find the item by ID to confirm it exists
+      const itemToDelete = deletedItems.find(item => 
+        (item._id === itemId || item.id === itemId)
+      );
+      
+      if (!itemToDelete) {
+        console.error("Item not found in deleted items:", itemId);
+        console.log("Available deleted items:", deletedItems);
+        alert("Error: Item not found. Please refresh the page and try again.");
+        return;
+      }
+      
+      console.log("Found item to delete:", itemToDelete);
+      
+      if (!window.confirm(`Are you sure you want to PERMANENTLY delete ${itemToDelete.name}? This cannot be undone.`)) {
+        return; // User cancelled
+      }
+      
+      const itemIdToUse = itemToDelete._id || itemToDelete.id;
+      console.log("Using ID for deletion:", itemIdToUse);
+      
+      try {
+        if (isGuest) {
+          // Use guest API service - permanently delete from deleted items
+          const { default: guestApiService } = await import('./services/guestApiService');
+          const result = await guestApiService.permanentlyDeleteFoodItem(itemToDelete.id);
+          if (result.success) {
+            // Remove from deleted items in UI
+            setDeletedItems(prev => prev.filter(item => 
+              (item._id !== itemId && item.id !== itemId)
+            ));
+            alert(`${itemToDelete.name} has been permanently deleted.`);
+          }
+        } else {
           // Permanently delete from backend
           const response = await fetch(`${API_URL}/food-items/${itemIdToUse}`, {
             method: "DELETE",
@@ -1107,11 +1564,11 @@ function App() {
             
             throw new Error(errorMessage);
           }
-        } catch (error) {
-          console.error("Error permanently deleting item:", error);
-          alert(`Error deleting item: ${error.message}. Please try again.`);
         }
-      })();
+      } catch (error) {
+        console.error("Error permanently deleting item:", error);
+        alert(`Error deleting item: ${error.message}. Please try again.`);
+      }
     }
   }
 
@@ -1121,6 +1578,7 @@ function App() {
       // Clear authentication data
       localStorage.removeItem("token");
       localStorage.removeItem("user");
+      localStorage.removeItem("isGuest");
       
       // Reset state
       setUser(null);
@@ -1130,6 +1588,7 @@ function App() {
       setItems([]);
       setConsumedItems([]);
       setWastedItems([]);
+      setDeletedItems([]);
       
       // Show login form (not signup)
       setShowLoginForm(true);

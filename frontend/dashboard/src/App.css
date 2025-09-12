@@ -2065,6 +2065,12 @@ input:checked+.slider:before {
   border-color: var(--primary-color);
 }
 
+.inventory-action-button.storage:hover {
+  background-color: rgba(99, 102, 241, 0.1);
+  color: var(--secondary-color);
+  border-color: var(--secondary-color);
+}
+
 /* Food Insights Styles */
 .food-insights {
   margin-top: 32px;
@@ -2820,9 +2826,10 @@ input:checked+.slider:before {
   padding: 32px;
   display: flex;
   align-items: center;
+  justify-content: center;
   max-height: calc(90vh - 60px);
-  /* Accounting for the toggle buttons */
   overflow-y: auto;
+  box-sizing: border-box;
 }
 
 .login-content {
@@ -2832,13 +2839,17 @@ input:checked+.slider:before {
   display: flex;
   flex-direction: column;
   align-items: center;
+  max-height: 100%;
+  overflow-y: auto;
+  padding: 0 16px;
+  box-sizing: border-box;
 }
 
 .welcome-text {
   font-size: 1.5rem;
   font-weight: 600;
   color: var(--text-color);
-  margin-bottom: 20px;
+  margin-bottom: 0;
   text-align: center;
 }
 
@@ -2856,7 +2867,7 @@ input:checked+.slider:before {
   display: flex;
   justify-content: center;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 0;
   width: 100%;
 }
 
@@ -2981,11 +2992,17 @@ input[type="radio"]:checked+.radio-label {
   .auth-form {
     padding: 20px;
     max-height: calc(100vh - 100px);
+    align-items: flex-start;
   }
 
   .auth-card {
     height: auto;
     max-height: calc(100vh - 40px);
+  }
+
+  .login-content {
+    padding: 0 12px;
+    max-height: calc(100vh - 120px);
   }
 
   .auth-toggle-buttons {
@@ -3002,6 +3019,7 @@ input[type="radio"]:checked+.radio-label {
   }
 
   .welcome-text {
+    margin-bottom: 0;
     font-size: 20px;
   }
 
@@ -3589,6 +3607,7 @@ input[type="radio"]:checked+.radio-label {
   color: white;
   border: none;
   border-radius: 8px;
+  margin: 0;
   padding: 14px 20px;
   cursor: pointer;
   font-weight: 600;
@@ -3895,4 +3914,101 @@ tr.selected-row:hover {
 
 .alerts-actions button {
   margin-bottom: 0.5rem;
+}
+
+
+/* Guest Mode Banner */
+.guest-mode-banner {
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  padding: 16px 20px;
+  margin-bottom: 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(99, 102, 241, 0.2);
+  animation: slideDown 0.3s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-20px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.guest-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.guest-icon {
+  font-size: 1.5rem;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 8px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+}
+
+.guest-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.guest-text strong {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.guest-text span {
+  font-size: 0.85rem;
+  opacity: 0.9;
+}
+
+.guest-signup-btn {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 6px;
+  padding: 8px 16px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  backdrop-filter: blur(10px);
+}
+
+.guest-signup-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .guest-banner-content {
+    flex-direction: column;
+    text-align: center;
+    gap: 12px;
+  }
+  
+  .guest-text {
+    align-items: center;
+  }
+  
+  .guest-signup-btn {
+    width: 100%;
+    max-width: 200px;
+  }
 }
