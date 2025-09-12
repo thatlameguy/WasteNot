@@ -1,15 +1,15 @@
 import { useState } from "react";
 
 // Import avatar images
-import burgerAvatar from "../assets/avatars/burger_food_avatar_for_a_food_based.png";
-import doritoAvatar from "../assets/avatars/dorito_food_avatar_for_a_food_based.png";
-import eggAvatar from "../assets/avatars/egg_food_avatar_for_a_food_based.png";
-import milkAvatar from "../assets/avatars/milk_food_avatar_for_a_food_based.png";
-import spinachAvatar from "../assets/avatars/spinach_food_avatar_for_a_food_based.png";
-import tomatoAvatar from "../assets/avatars/tomato_food_avatar_for_a_food_based.png";
-import noodlesAvatar from "../assets/avatars/noodles_food_avatar_for_a_food_based.png";
-import tacoAvatar from "../assets/avatars/taco_food_avatar_for_a_food_based.png";
-import chapatiAvatar from "../assets/avatars/chapati_food_avatar_for_a_food_based.png";
+import burgerAvatar from "../assets/avatars/burger_food_avatar_for_a_food_based.webp";
+import doritoAvatar from "../assets/avatars/dorito_food_avatar_for_a_food_based.webp";
+import eggAvatar from "../assets/avatars/egg_food_avatar_for_a_food_based.webp";
+import milkAvatar from "../assets/avatars/milk_food_avatar_for_a_food_based.webp";
+import spinachAvatar from "../assets/avatars/spinach_food_avatar_for_a_food_based.webp";
+import tomatoAvatar from "../assets/avatars/tomato_food_avatar_for_a_food_based.webp";
+import noodlesAvatar from "../assets/avatars/noodles_food_avatar_for_a_food_based.webp";
+import tacoAvatar from "../assets/avatars/taco_food_avatar_for_a_food_based.webp";
+import chapatiAvatar from "../assets/avatars/chapati_food_avatar_for_a_food_based.webp";
 
 // Avatar image paths with direct imports
 const AVATARS = [
