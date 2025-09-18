@@ -88,7 +88,7 @@ const getRecipeSuggestions = async (req, res) => {
       return res.status(400).json({ message: 'Groq API key is required' });
     }
     
-    const groqEndpoint = 'https://api.groq.com/openai/v1/chat/completions';
+    const groqEndpoint = 'https://console.groq.com/keys';
     
     const response = await fetch(groqEndpoint, {
       method: 'POST',
