@@ -8,7 +8,7 @@ const fetch = require('node-fetch');
 const calculateFreshnessWithGroq = async (foodItem) => {
   try {
     const GROQ_API_KEY = process.env.GROQ_API_KEY;
-    const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
+    const GROQ_API_URL = 'https://console.groq.com/keys';
 
     if (!GROQ_API_KEY) {
       console.warn('GROQ_API_KEY not found in environment variables, falling back to basic calculation');
