@@ -103,7 +103,7 @@ const Login = ({ onToggleForm, onForgotPassword }) => {
 
       {error && <div className="auth-error">{error}</div>}
 
-      <form onSubmit={handleSubmit}>
+      <form className="login-form" onSubmit={handleSubmit}>
         <div className="form-group">
           <label htmlFor="email">Email</label>
           <input

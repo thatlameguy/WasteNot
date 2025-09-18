@@ -2830,6 +2830,41 @@ input:checked+.slider:before {
   max-height: calc(90vh - 60px);
   overflow-y: auto;
   box-sizing: border-box;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+/* Modern scrollbar for auth-form */
+.auth-form::-webkit-scrollbar {
+  width: 6px;
+}
+
+.auth-form::-webkit-scrollbar-track {
+  background: transparent;
+  border-radius: 3px;
+}
+
+.auth-form::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+}
+
+.auth-form::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.4);
+}
+
+/* Dark theme scrollbar for auth-form */
+.dark-theme .auth-form {
+  scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
+}
+
+.dark-theme .auth-form::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark-theme .auth-form::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.4);
 }
 
 .login-content {
