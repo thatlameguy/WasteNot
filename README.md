@@ -8,7 +8,7 @@
 
 ## 📌 Problem Statement
 
-**Problem Statement 1 – Weave AI magic with Groq | Sustainable Food Management for Zero Waste**
+**Problem Statement 1 – Weave AI magic with Gemini | Sustainable Food Management for Zero Waste**
 
 ---
 
@@ -48,12 +48,12 @@ Syntax Terror
 - Frontend: React.js, React Router, Lucide Icons, CSS
 - Backend: Node.js, Express.js
 - Database: MongoDB with Mongoose ODM
-- APIs: Groq API for maintaining freshness of food items and recipe suggestions
+- APIs: Google Gemini AI for maintaining freshness of food items and recipe suggestions
 - Hosting: Vercel (frontend), Render (backend)
 
 ### Sponsor Technologies Used (if any):
 
-- [X] **Groq:** _We utilized Groq's LLM API for maintaining freshness calculations and generating personalized recipe suggestions based on users' available ingredients. Groq's ultra-fast inference speeds allowed us to provide real-time food freshness tracking and recipe recommendations that prioritize items nearing expiration, significantly enhancing the user experience while reducing latency compared to other LLM solutions._
+- [X] **Gemini AI:** _We integrated Google's Gemini AI for calculating food freshness and generating personalized recipe suggestions based on users' available ingredients. Gemini's advanced language models enable intelligent freshness assessment considering multiple factors like storage conditions, food category, and shelf life. The AI also powers our recipe recommendation system that prioritizes items nearing expiration, helping users reduce food waste while discovering creative meal ideas._
 - [ ] **Monad:** _Your blockchain implementation_
 - [ ] **Fluvio:** _Real-time data handling_
 - [ ] **Base:** _AgentKit / OnchainKit / Smart Wallet usage_
@@ -100,7 +100,7 @@ Highlight the most important features of your project:
 - npm or yarn
 - MongoDB database
 - Email service credentials (for password reset functionality)
-- Groq API key (for recipe suggestion functionality)
+- Google Gemini API key (for recipe suggestion functionality)
 
 ### Local Setup:
 
@@ -159,7 +159,7 @@ List improvements, extensions, or follow-up features:
 - Express.js for the backend API framework
 - JWT for secure authentication
 - Lucide Icons for UI elements
-- Groq API for intelligent recipe suggestions and freshness tracking
+- Google Gemini AI for intelligent recipe suggestions and freshness tracking
 
 ---
 

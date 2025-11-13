@@ -1080,7 +1080,7 @@ function App() {
       
       case 'update-freshness':
         // Update the freshness value of an item
-        const freshness = additionalData; // The freshness value from Groq API
+        const freshness = additionalData; // The freshness value from Gemini AI
         
         if (typeof freshness === 'number') {
           // Update the backend to store this freshness value permanently
@@ -2000,7 +2000,7 @@ function App() {
                     </button>
                   </>
                 )}
-              </div>
+                                                     </div>
               
               <FoodInsights items={items} />
             </div>

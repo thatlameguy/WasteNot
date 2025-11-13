@@ -140,7 +140,7 @@ function UpcomingExpirations({ items, onItemAction }) {
     }
   }
 
-  // Recalculate freshness using Groq AI
+  // Recalculate freshness using Gemini AI
   const recalculateFreshness = async (itemId) => {
     try {
       // Prevent duplicate calculations

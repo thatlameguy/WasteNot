@@ -439,16 +439,31 @@ Return ONLY the JSON object. Do not include any text before or after the JSON.`;
 	}
 }
 
-async function generateRecipeSuggestionsWithGemini(ingredients) {
+async function generateRecipeSuggestionsWithGemini(ingredients, expiringItems = []) {
 	try {
-		// Improved prompt with strict JSON instruction
+		// Build context about expiring items
+		const expiringContext = expiringItems.length > 0 
+			? `\n\nURGENT PRIORITY: The following ingredients are expiring soon and MUST be used in as many recipes as possible: ${expiringItems.join(', ')}\nYou MUST prioritize these expiring ingredients in your recipe suggestions!`
+			: '';
+
+		// Improved prompt with strict JSON instruction and emphasis on user's inventory
 		const prompt = `You are a helpful cooking assistant specializing in creating recipes from available ingredients.
 
-Using these ingredients: ${ingredients.join(', ')}
+CRITICAL: You MUST create recipes that PRIMARILY use the ingredients provided by the user. Each recipe MUST use at least 3-4 ingredients from the user's inventory.
 
-Generate exactly 5 diverse, creative recipes. Return ONLY valid, complete JSON with no additional text, explanations, or markdown formatting.
+User's Available Ingredients: ${ingredients.join(', ')}${expiringContext}
 
-CRITICAL REQUIREMENTS:
+Generate exactly 5 diverse, creative recipes that make the BEST use of these specific ingredients. Return ONLY valid, complete JSON with no additional text, explanations, or markdown formatting.
+
+RECIPE REQUIREMENTS:
+1. Each recipe MUST use at least 3-4 ingredients from the user's available inventory
+2. ${expiringItems.length > 0 ? `HIGHEST PRIORITY: Create recipes that use these expiring ingredients: ${expiringItems.join(', ')}` : 'Prioritize recipes that use MORE ingredients from the user\'s inventory'}
+3. Additional ingredients (pantry staples like salt, pepper, oil) are allowed but should be minimal
+4. The matchedIngredients field MUST list the user's ingredients used in that recipe
+5. Generate exactly 5 diverse recipes with different cooking styles and cuisines
+6. Make recipes practical and achievable with home cooking equipment
+
+CRITICAL JSON FORMAT REQUIREMENTS:
 1. Return ONLY valid JSON - no text before or after
 2. Ensure the JSON is complete and properly closed (all brackets and braces closed)
 3. Do not truncate or cut off the response
@@ -458,27 +473,30 @@ REQUIRED JSON FORMAT:
 {
   "recipes": [
     {
-      "title": "<string>",
-      "ingredients": ["<string>", ...],
-      "instructions": "<string - step by step instructions>",
+      "title": "<string - descriptive recipe name>",
+      "ingredients": ["<string - full ingredient list including amounts>", ...],
+      "instructions": "<string - clear step by step instructions>",
       "prepTime": "<string - e.g., '10 mins'>",
       "cookTime": "<string - e.g., '20 mins'>",
-      "matchedIngredients": ["<string>", ...]
+      "matchedIngredients": ["<string - ingredients from user's inventory>", ...]
     }
   ]
 }
 
-Recipe Requirements:
-- Generate exactly 5 recipes
-- Each recipe must use at least 2 ingredients from the provided list
-- matchedIngredients should be a subset of the provided ingredients
-- Instructions should be clear, step-by-step (but concise)
-- Ensure variety (different cuisines, cooking methods, meal types)
-- Make recipes practical and achievable
+IMPORTANT REMINDERS:
+- Focus on the user's available ingredients: ${ingredients.join(', ')}
+${expiringItems.length > 0 ? `- PRIORITIZE these expiring ingredients: ${expiringItems.join(', ')}` : ''}
+- Each recipe should highlight different ways to use these ingredients
+- matchedIngredients should contain 3-4 items minimum from the user's inventory
+- Be creative but practical with the available ingredients
+- Ensure variety (breakfast, lunch, dinner, snacks, etc.)
 
-IMPORTANT: Return a complete, valid JSON object. Ensure all arrays and objects are properly closed.`;
+Return a complete, valid JSON object. Ensure all arrays and objects are properly closed.`;
 
 		console.log(`\n🍳 Generating recipe suggestions for ingredients: ${ingredients.join(', ')}`);
+		if (expiringItems.length > 0) {
+			console.log(`⚠️ Prioritizing expiring items: ${expiringItems.join(', ')}`);
+		}
 		const json = await callGeminiJSON(prompt, { 
 			temperature: 0.9, 
 			maxOutputTokens: 4000, // Increased to handle 5 complete recipes

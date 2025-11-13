@@ -79,10 +79,28 @@ const getRecipeSuggestions = async (req, res) => {
       });
     }
     
-    // Extract food item names
-    const ingredients = foodItems.map(item => item.name);
+    // Calculate days until expiry for each item and sort by urgency
+    const today = new Date();
+    const itemsWithExpiry = foodItems.map(item => {
+      const daysUntilExpiry = Math.floor((new Date(item.expiryDate) - today) / (1000 * 60 * 60 * 24));
+      return {
+        name: item.name,
+        daysUntilExpiry,
+        freshness: item.freshness || 100
+      };
+    }).sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry); // Sort by most urgent first
     
-    const recipes = await generateRecipeSuggestionsWithGemini(ingredients);
+    // Separate items by urgency
+    const expiringItems = itemsWithExpiry.filter(item => item.daysUntilExpiry <= 3).map(item => item.name);
+    const allIngredients = itemsWithExpiry.map(item => item.name);
+    
+    // Pass prioritized ingredient list to the recipe generator
+    // If there are expiring items, put them first in the list
+    const prioritizedIngredients = expiringItems.length > 0 
+      ? [...new Set([...expiringItems, ...allIngredients])] // Remove duplicates while keeping expiring items first
+      : allIngredients;
+    
+    const recipes = await generateRecipeSuggestionsWithGemini(prioritizedIngredients, expiringItems);
     res.json({ recipes });
   } catch (error) {
     console.error("Error getting recipe suggestions:", error);
