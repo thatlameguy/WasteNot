@@ -1,7 +1,36 @@
 // backend/controllers/foodItemController.js
 const FoodItem = require('../models/foodItemModel');
-const { calculateFreshnessWithGroq } = require('../utils/groqHelper');
+const { calculateFreshnessWithGemini } = require('../utils/geminiHelper');
 const mongoose = require('mongoose');
+
+/**
+ * Validates and sanitizes a MongoDB ObjectId from request parameters
+ * @param {string} id - The ID to validate
+ * @param {string} paramName - Name of the parameter (for error messages)
+ * @returns {Object} - { isValid: boolean, error?: string, sanitizedId?: string }
+ */
+function validateObjectId(id, paramName = 'ID') {
+  // Check if ID exists
+  if (!id || id === 'undefined' || id === 'null' || id.trim() === '') {
+    return {
+      isValid: false,
+      error: `${paramName} is required and cannot be empty`
+    };
+  }
+
+  // Check if ID is a valid MongoDB ObjectId format
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return {
+      isValid: false,
+      error: `Invalid ${paramName} format: "${id}" is not a valid MongoDB ObjectId`
+    };
+  }
+
+  return {
+    isValid: true,
+    sanitizedId: id.trim()
+  };
+}
 
 // @desc    Add a new food item
 // @route   POST /api/food-items
@@ -62,9 +91,20 @@ const getFoodItems = async (req, res) => {
 // @access  Private
 const updateFoodItem = async (req, res) => {
   try {
-    const foodItem = await FoodItem.findById(req.params.id);
+    // Validate the ID parameter
+    const idValidation = validateObjectId(req.params.id, 'Food item ID');
+    if (!idValidation.isValid) {
+      console.error(`❌ ${idValidation.error}`);
+      return res.status(400).json({ 
+        message: 'Invalid request',
+        error: idValidation.error
+      });
+    }
+
+    const foodItem = await FoodItem.findById(idValidation.sanitizedId);
 
     if (!foodItem) {
+      console.error(`❌ Food item not found with ID: ${idValidation.sanitizedId}`);
       return res.status(404).json({ message: 'Food item not found' });
     }
 
@@ -257,32 +297,55 @@ const getDeletedItems = async (req, res) => {
   }
 };
 
-// @desc    Calculate freshness for a food item using Groq AI
+// @desc    Calculate freshness for a food item using Gemini AI
 // @route   GET /api/food-items/:id/freshness
 // @access  Private
 const calculateFreshness = async (req, res) => {
   try {
-    const { id } = req.params;
+    // Extract and validate the ID parameter
+    const idValidation = validateObjectId(req.params.id, 'Food item ID');
+    if (!idValidation.isValid) {
+      console.error(`❌ ${idValidation.error}`);
+      return res.status(400).json({ 
+        message: 'Invalid request',
+        error: idValidation.error
+      });
+    }
+
+    const id = idValidation.sanitizedId;
+
+    // Log the request for debugging
+    console.log(`🔍 Calculating freshness for food item ID: ${id}`);
+
+    // Find the food item
     const foodItem = await FoodItem.findById(id);
 
     if (!foodItem) {
-      return res.status(404).json({ message: 'Food item not found' });
+      console.error(`❌ Food item not found with ID: ${id}`);
+      return res.status(404).json({ 
+        message: 'Food item not found',
+        error: `No food item found with ID: ${id}`
+      });
     }
 
     // Check if user is authorized to view this food item
     if (foodItem.userId.toString() !== req.user.id) {
-      return res.status(403).json({ message: 'Not authorized to access this food item' });
+      console.error(`❌ Unauthorized access attempt: User ${req.user.id} tried to access food item ${id} owned by ${foodItem.userId}`);
+      return res.status(403).json({ 
+        message: 'Not authorized to access this food item',
+        error: 'You do not have permission to access this food item'
+      });
     }
 
     console.log(`Calculating freshness for: ${foodItem.name} (Condition: ${foodItem.condition}, Expiry: ${foodItem.expiryDate})`);
 
-    // Calculate freshness using the GroqAI utility - now with extended return values
-    const freshnesResult = await calculateFreshnessWithGroq(foodItem);
+    // Calculate freshness using the Gemini utility - now with extended return values
+    const freshnesResult = await calculateFreshnessWithGemini(foodItem);
 
     // Extract values from the calculation result
     const { freshness, needsAlert, explanation } = freshnesResult;
     
-    console.log(`Groq freshness result: ${freshness}%, needsAlert: ${needsAlert}, reason: ${explanation}`);
+    console.log(`Gemini freshness result: ${freshness}%, needsAlert: ${needsAlert}, reason: ${explanation}`);
 
     // Apply additional validation rules to ensure the freshness makes sense
     let validatedFreshness = freshness;
@@ -358,8 +421,55 @@ const calculateFreshness = async (req, res) => {
       explanation: validatedExplanation
     });
   } catch (error) {
-    console.error('Error calculating freshness:', error);
-    return res.status(500).json({ message: 'Server error calculating freshness', error: error.message });
+    // Handle specific Mongoose CastError (invalid ObjectId)
+    if (error.name === 'CastError' && error.path === '_id') {
+      console.error('❌ CastError: Invalid ObjectId format for food item ID');
+      console.error('Error details:', {
+        value: error.value,
+        path: error.path,
+        kind: error.kind
+      });
+      return res.status(400).json({ 
+        message: 'Invalid food item ID format',
+        error: `The provided ID "${error.value}" is not a valid MongoDB ObjectId`,
+        details: 'Please ensure the food item ID is a valid 24-character hexadecimal string'
+      });
+    }
+
+    // Handle other Mongoose errors
+    if (error.name === 'CastError') {
+      console.error('❌ CastError:', error.message);
+      return res.status(400).json({ 
+        message: 'Invalid data format',
+        error: error.message
+      });
+    }
+
+    // Handle validation errors
+    if (error.name === 'ValidationError') {
+      console.error('❌ ValidationError:', error.message);
+      return res.status(400).json({ 
+        message: 'Validation error',
+        error: error.message,
+        details: error.errors
+      });
+    }
+
+    // Handle all other errors
+    console.error('❌ Error calculating freshness:', error.message);
+    console.error('Error stack:', error.stack);
+    console.error('Error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack?.split('\n').slice(0, 5) // First 5 lines of stack
+    });
+
+    return res.status(500).json({ 
+      message: 'Server error calculating freshness',
+      error: process.env.NODE_ENV === 'production' 
+        ? 'An internal server error occurred' 
+        : error.message
+    });
   }
 };
 

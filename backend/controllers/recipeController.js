@@ -2,6 +2,7 @@
 const Recipe = require('../models/recipeModel');
 const FoodItem = require('../models/foodItemModel');
 const fetch = require('node-fetch');
+const { generateRecipeSuggestionsWithGemini } = require('../utils/geminiHelper');
 
 // @desc    Save a recipe
 // @route   POST /api/recipes
@@ -81,61 +82,11 @@ const getRecipeSuggestions = async (req, res) => {
     // Extract food item names
     const ingredients = foodItems.map(item => item.name);
     
-    // Implement Groq API call here (need Groq API key to be passed)
-    const groqApiKey = req.headers['groq-api-key'];
-    
-    if (!groqApiKey) {
-      return res.status(400).json({ message: 'Groq API key is required' });
-    }
-    
-    const groqEndpoint = 'https://console.groq.com/keys';
-    
-    const response = await fetch(groqEndpoint, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'llama3-70b-8192',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful cooking assistant that specializes in recommending recipes based on available ingredients.'
-          },
-          {
-            role: 'user',
-            content: `I have the following ingredients: ${ingredients.join(', ')}. Can you suggest 5 recipes that I can make with these ingredients? For each recipe, include the title, list of ingredients, cooking instructions, preparation time, and cooking time. Format the response as JSON with the following structure: { "recipes": [{ "title": "Recipe Title", "ingredients": ["ingredient1", "ingredient2", ...], "instructions": "Step by step instructions", "prepTime": "X mins", "cookTime": "Y mins", "matchedIngredients": ["matched1", "matched2", ...] }] }`
-          }
-        ],
-        temperature: 0.7,
-        max_tokens: 4000,
-        response_format: { type: 'json_object' }
-      })
-    });
-    
-    const data = await response.json();
-    
-    if (!response.ok) {
-      console.error('Groq API error:', data);
-      return res.status(500).json({ message: 'Failed to get recipe suggestions' });
-    }
-    
-    // Parse the generated recipes
-    const content = data.choices[0].message.content;
-    let recipes;
-    
-    try {
-      recipes = JSON.parse(content).recipes;
-    } catch (error) {
-      console.error('Error parsing Groq response:', error);
-      return res.status(500).json({ message: 'Failed to parse recipe suggestions' });
-    }
-    
-    // Return the recipes
+    const recipes = await generateRecipeSuggestionsWithGemini(ingredients);
     res.json({ recipes });
   } catch (error) {
     console.error("Error getting recipe suggestions:", error);
+    console.error("Error stack:", error.stack);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
