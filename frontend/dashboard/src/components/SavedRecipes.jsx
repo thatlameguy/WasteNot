@@ -10,7 +10,6 @@ function SavedRecipes() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [selectedRecipe, setSelectedRecipe] = useState(null)
-  const [groqApiKey, setGroqApiKey] = useState(localStorage.getItem("groqApiKey") || "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")
 
   useEffect(() => {
     fetchSavedRecipes()

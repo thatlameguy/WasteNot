@@ -421,13 +421,19 @@ function App() {
       
       // If there are items needing update, call the API for each
       if (itemsNeedingUpdate.length > 0) {
-        console.log(`Updating freshness for ${itemsNeedingUpdate.length} items via Groq AI`);
+        console.log(`Updating freshness for ${itemsNeedingUpdate.length} items via Gemini AI`);
         
         const token = localStorage.getItem("token");
         if (!token) return;
         
         // Update each item one by one
         itemsNeedingUpdate.forEach(item => {
+          // Validate that item has a valid _id before making the API call
+          if (!item._id) {
+            console.error(`⚠️ Skipping freshness update for item "${item.name}" - missing _id`);
+            return;
+          }
+
           fetch(`${API_URL}/food-items/${item._id}/freshness`, {
             method: "GET",
             headers: {
