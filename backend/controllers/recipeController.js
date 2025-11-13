@@ -69,8 +69,11 @@ const deleteRecipe = async (req, res) => {
 // @access  Private
 const getRecipeSuggestions = async (req, res) => {
   try {
-    // Get the user's food items
-    const foodItems = await FoodItem.find({ userId: req.user._id });
+    // Get only the user's active food items (available inventory)
+    const foodItems = await FoodItem.find({ 
+      userId: req.user._id,
+      status: 'active'
+    });
     
     if (foodItems.length === 0) {
       return res.status(200).json({ 
