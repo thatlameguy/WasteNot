@@ -8,12 +8,12 @@ function AddItem({ onAddClick }) {
       <h2>Add Item</h2>
 
       <div className="add-options">
-        <div className="add-option" onClick={onAddClick}>
+        {/* <div className="add-option" onClick={onAddClick}>
           <div className="icon-container">
             <Camera size={24} />
           </div>
           <span>Scan Receipt</span>
-        </div>
+        </div> */}
 
         <div className="add-option" onClick={onAddClick}>
           <div className="icon-container">
